@@ -770,26 +770,40 @@ export const SupabaseService = {
     console.log(`[SupabaseService] Début de l'import des données de démo (${articles.length} articles, ${events.length} évènements)...`);
     
     try {
+      // Vérification JWT
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.warn("[SupabaseService] Aucune session active. L'import risque d'échouer si RLS est actif.");
+      } else {
+        console.log(`[SupabaseService] Connecté en tant que: ${session.user.email}`);
+      }
+
       if (articles.length > 0) {
+        console.log("[SupabaseService] Upserting articles...");
         const { error: artError } = await supabase.from('articles').upsert(articles);
         if (artError) {
-          console.error("[SupabaseService] Erreur import articles:", artError);
-          throw artError;
+          console.error("[SupabaseService] Erreur détaillée import articles:", artError);
+          throw new Error(`Articles: ${artError.message} (Code: ${artError.code})`);
         }
       }
       
       if (events.length > 0) {
+        console.log("[SupabaseService] Upserting events...");
         const { error: evtError } = await supabase.from('events').upsert(events);
         if (evtError) {
-          console.error("[SupabaseService] Erreur import évènements:", evtError);
-          throw evtError;
+          console.error("[SupabaseService] Erreur détaillée import évènements:", evtError);
+          throw new Error(`Évènements: ${evtError.message} (Code: ${evtError.code})`);
         }
       }
       
       console.log("[SupabaseService] Import réussi !");
     } catch (error: any) {
       console.error("[SupabaseService] ÉCHEC GLOBAL de l'import:", error);
-      throw new Error(`Échec de l'import: ${error.message || "Erreur inconnue"}`);
+      const msg = error.message || "Erreur inconnue";
+      if (msg.includes("row-level security")) {
+        throw new Error("Échec: Violation des politiques de sécurité (RLS). Vérifiez que vous êtes connecté avec le bon compte administrateur.");
+      }
+      throw new Error(`Échec de l'import: ${msg}`);
     }
   }
 };
