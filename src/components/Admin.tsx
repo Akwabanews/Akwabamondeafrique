@@ -97,10 +97,10 @@ const GitHubImageUpload = ({
           return;
         }
 
-        const response = await fetch(`https://api.github.com/repos/Akwabanews/akwaba-info/contents/public/images/${fileName}`, {
+        const response = await fetch(`https://api.github.com/repos/Akwabanews/Akwabamondeafrique/contents/public/images/${fileName}`, {
           method: 'PUT',
           headers: {
-            'Authorization': `token ${token}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -110,7 +110,7 @@ const GitHubImageUpload = ({
         });
 
         if (response.ok) {
-          const rawUrl = `https://raw.githubusercontent.com/Akwabanews/akwaba-info/main/public/images/${fileName}`;
+          const rawUrl = `https://raw.githubusercontent.com/Akwabanews/Akwabamondeafrique/main/public/images/${fileName}`;
           onChange(rawUrl);
           alert("✅ Image téléchargée avec succès !");
         } else {
