@@ -345,11 +345,12 @@ export const SupabaseService = {
     if (isPlaceholder) return;
     
     // 1. Insert into database
-    // We use a simpler insert/upsert and handle existing emails gracefully
+    // Using .insert instead of .upsert to avoid needing SELECT/UPDATE permissions (simpler RLS)
     const { error: dbError } = await supabase
       .from('subscribers')
-      .upsert({ email }, { onConflict: 'email' });
+      .insert({ email });
     
+    // 23505 is the code for unique constraint violation (already subscribed)
     if (dbError && dbError.code !== '23505') {
       console.error("Database subscription error:", dbError);
       throw new Error(`Erreur Base de données: ${dbError.message}`);
