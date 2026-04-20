@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion OTP - Akwaba Info</title>
+    <!-- Supabase v2 via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-black text-slate-900 uppercase tracking-tight mb-2">Akwaba Info</h1>
+            <p class="text-slate-500 font-medium">Connexion par Email OTP uniquement</p>
+        </div>
+
+        <form id="loginForm" class="space-y-6">
+            <div>
+                <label for="email" class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-4">Votre Email</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    required 
+                    class="w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:border-emerald-500/20 focus:bg-white rounded-2xl text-sm font-bold transition-all outline-none"
+                    placeholder="nom@exemple.com"
+                >
+            </div>
+
+            <button 
+                type="submit" 
+                id="submitBtn"
+                class="w-full py-4 bg-emerald-500 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 disabled:opacity-50 transition-all flex items-center justify-center gap-3"
+            >
+                <span id="btnText">Recevoir le lien</span>
+                <div id="loader" class="hidden animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+            </button>
+        </form>
+
+        <div id="message" class="mt-6 hidden p-4 rounded-2xl text-sm font-bold text-center"></div>
+
+        <p class="mt-8 text-center text-xs text-slate-400 font-medium leading-relaxed">
+            Un lien de connexion sera envoyé à votre adresse. <br>
+            Plus besoin de mot de passe !
+        </p>
+    </div>
+
+    <script shadow="true">
+        // Configuration Supabase
+        const SUPABASE_URL = "https://txbiglivommcvqnebqwv.supabase.co/";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4YmlnbGl2b21tY3ZxbmVicXd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MDE1NDcsImV4cCI6MjA5MjE3NzU0N30.42O48XMyUdC5afeLpiKaefGaybJ4oos_3keeK8FHvAM";
+
+        // Initialisation correcte du client Supabase v2
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const loginForm = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const btnText = document.getElementById('btnText');
+        const loader = document.getElementById('loader');
+        const messageDiv = document.getElementById('message');
+
+        // Fonction login demandée
+        async function login(email) {
+            const { data, error } = await supabase.auth.signInWithOtp({
+                email: email,
+                options: {
+                    emailRedirectTo: window.location.origin,
+                }
+            });
+            if (error) throw error;
+            return data;
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // ✅ Pas de recharge
+            
+            const email = document.getElementById('email').value;
+
+            // Interface Loading
+            setError(null);
+            setLoading(true);
+
+            try {
+                // Appel de la fonction login existante
+                await login(email);
+
+                setSuccess("Vérifiez votre boîte mail ! Un lien OTP vous a été envoyé.");
+                loginForm.reset();
+
+            } catch (err) {
+                console.error("Erreur de connexion:", err);
+                setError(err.message || "Impossible d'envoyer le lien.");
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        function setLoading(isLoading) {
+            submitBtn.disabled = isLoading;
+            if (isLoading) {
+                btnText.classList.add('hidden');
+                loader.classList.remove('hidden');
+            } else {
+                btnText.classList.remove('hidden');
+                loader.classList.add('hidden');
+            }
+        }
+
+        function setError(msg) {
+            messageDiv.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-700');
+            if (msg) {
+                messageDiv.classList.add('bg-red-50', 'text-red-700', 'block');
+                messageDiv.textContent = "⚠️ " + msg;
+            } else {
+                messageDiv.classList.add('hidden');
+            }
+        }
+
+        function setSuccess(msg) {
+            messageDiv.classList.remove('hidden', 'bg-red-50', 'text-red-700');
+            messageDiv.classList.add('bg-emerald-50', 'text-emerald-700', 'block');
+            messageDiv.textContent = "✅ " + msg;
+        }
+    </script>
+</body>
+</html>
