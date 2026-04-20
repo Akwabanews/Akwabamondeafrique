@@ -2236,6 +2236,7 @@ export const AdminEditor = ({
   
   const [previewMode, setPreviewMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [seoGenerated, setSeoGenerated] = useState(false);
 
   const slugify = (text: string) => {
     return text
@@ -2245,6 +2246,103 @@ export const AdminEditor = ({
       .replace(/[^\w ]+/g, '')
       .replace(/ +/g, '-')
       .replace(/^-+|-+$/g, '');
+  };
+
+  const generateExcerpt = (content: string, maxLength: number = 150) => {
+    if (!content) return '';
+    // Clean markdown basics
+    const cleanContent = content.replace(/[#*`_\[\]()]/g, '').trim();
+    // Get first two sentences
+    const sentences = cleanContent.split(/[.!?]/).filter(s => s.trim().length > 0);
+    let excerpt = sentences.slice(0, 2).join('. ').trim();
+    if (excerpt.length > maxLength) {
+      excerpt = excerpt.substring(0, maxLength).trim() + '...';
+    } else if (excerpt.length > 0 && excerpt.length < cleanContent.length && !excerpt.endsWith('.')) {
+      excerpt += '.';
+    }
+    return excerpt;
+  };
+
+  const generateSeoTitle = (title: string) => {
+    if (!title) return '';
+    let seo = title.trim();
+    if (seo.length > 60) {
+      seo = seo.substring(0, 57) + '...';
+    } else if (seo.length + 15 <= 60) {
+      seo = `${seo} - Akwaba Info`;
+    }
+    return seo;
+  };
+
+  const calculateReadingTime = (content: string) => {
+    if (!content) return '1 min';
+    const words = content.trim().split(/\s+/).length;
+    const minutes = Math.ceil(words / 200);
+    return `${minutes} min`;
+  };
+
+  const extractTags = (content: string, maxTags: number = 5) => {
+    if (!content) return [];
+    const stopWords = ['le', 'la', 'les', 'de', 'des', 'un', 'une', 'et', 'ou', 'à', 'en', 'au', 'aux', 'du', 'pour', 'par', 'sur', 'dans', 'ce', 'cette', 'ces', 'est', 'sont', 'que', 'qui', 'plus', 'avec', 'tout'];
+    const words = content
+      .toLowerCase()
+      .replace(/[.,!?;:()\[\]{}"]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 3 && !stopWords.includes(w));
+    
+    const freq: Record<string, number> = {};
+    words.forEach(w => {
+      freq[w] = (freq[w] || 0) + 1;
+    });
+    
+    return Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, maxTags)
+      .map(entry => entry[0]);
+  };
+
+  const handleAutoSeo = () => {
+    const newDraft = { ...formData };
+    let changed = false;
+
+    if (!newDraft.slug && newDraft.title) {
+      newDraft.slug = slugify(newDraft.title);
+      changed = true;
+    }
+
+    if (!newDraft.excerpt && newDraft.content) {
+      newDraft.excerpt = generateExcerpt(newDraft.content);
+      changed = true;
+    }
+
+    if (!newDraft.seoTitle && newDraft.title) {
+      newDraft.seoTitle = generateSeoTitle(newDraft.title);
+      changed = true;
+    }
+
+    if (!newDraft.seoDescription && newDraft.content) {
+      newDraft.seoDescription = generateExcerpt(newDraft.content, 160);
+      changed = true;
+    }
+
+    if (type === 'article') {
+      if ((!newDraft.readingTime || newDraft.readingTime === '4 min') && newDraft.content) {
+        newDraft.readingTime = calculateReadingTime(newDraft.content);
+        changed = true;
+      }
+      if ((!newDraft.tags || newDraft.tags.length === 0) && newDraft.content) {
+        newDraft.tags = extractTags(newDraft.content);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setFormData(newDraft);
+      setSeoGenerated(true);
+      setTimeout(() => setSeoGenerated(false), 2000);
+    } else {
+      alert("Tous les champs SEO sont déjà remplis !");
+    }
   };
 
   const validate = () => {
@@ -2522,7 +2620,19 @@ export const AdminEditor = ({
 
         <div className="space-y-6">
           <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-lg space-y-6">
-            <h4 className="font-black text-sm uppercase tracking-widest">Métadonnées</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-black text-sm uppercase tracking-widest">Métadonnées</h4>
+              <button 
+                onClick={handleAutoSeo}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all",
+                  seoGenerated ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-primary/10 hover:text-primary"
+                )}
+              >
+                {seoGenerated ? <CheckCircle size={12} /> : "🔄"}
+                {seoGenerated ? "SEO Généré !" : "Générer le SEO"}
+              </button>
+            </div>
             
             <div className="space-y-6">
               {/* --- Section: Général --- */}
