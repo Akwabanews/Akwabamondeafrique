@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Lock, 
   Plus, 
@@ -48,6 +48,7 @@ import {
   Mic,
   Music,
   Headset,
+  Upload,
   Heart,
   CreditCard,
   Award,
@@ -61,6 +62,110 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { SupabaseService } from '../lib/supabase';
 import { MOCK_ARTICLES, MOCK_EVENTS } from '../constants';
+
+const GitHubImageUpload = ({ 
+  value, 
+  onChange, 
+  placeholder,
+  icon: Icon = Smartphone,
+  inputClassName = "bg-slate-50"
+}: { 
+  value: string, 
+  onChange: (val: string) => void,
+  placeholder?: string,
+  icon?: any,
+  inputClassName?: string
+}) => {
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        const fileName = `${Date.now()}-${file.name.replace(/\s+/g, '-')}`;
+        const token = import.meta.env.VITE_GITHUB_TOKEN;
+
+        if (!token) {
+          alert("Erreur: VITE_GITHUB_TOKEN n'est pas configurée.");
+          setIsUploading(false);
+          return;
+        }
+
+        const response = await fetch(`https://api.github.com/repos/Akwabanews/akwaba-info/contents/public/images/${fileName}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `token ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: `Upload image ${fileName}`,
+            content: base64,
+          }),
+        });
+
+        if (response.ok) {
+          const rawUrl = `https://raw.githubusercontent.com/Akwabanews/akwaba-info/main/public/images/${fileName}`;
+          onChange(rawUrl);
+          alert("✅ Image téléchargée avec succès !");
+        } else {
+          const err = await response.json();
+          console.error("GitHub upload error:", err);
+          alert(`Erreur d'upload: ${err.message || 'Inconnue'}`);
+        }
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert("Erreur lors du téléchargement.");
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="relative flex gap-2">
+      <div className="relative flex-1">
+        <Icon size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input 
+          type="text" 
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={cn("w-full rounded-xl pl-9 pr-4 py-3 text-[10px] outline-none focus:ring-2 focus:ring-primary/10 transition-all", inputClassName)}
+          placeholder={placeholder || "https://..."}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={isUploading}
+        className={cn(
+          "px-4 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary transition-all shadow-lg shadow-slate-900/10 shrink-0",
+          isUploading && "opacity-50 cursor-not-allowed"
+        )}
+      >
+        {isUploading ? (
+          <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        ) : (
+          <Upload size={14} />
+        )}
+        {isUploading ? "..." : "📤 Upload"}
+      </button>
+      <input 
+        type="file" 
+        ref={fileInputRef}
+        onChange={handleUpload}
+        className="hidden"
+        accept="image/*"
+      />
+    </div>
+  );
+};
 
 export const AdminLogin = ({ onLogin }: { onLogin: () => void }) => {
   return (
@@ -2529,16 +2634,11 @@ export const AdminEditor = ({
                 <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-widest"><ImagePlus size={14}/> Médias & Source</div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Lien Image Principale</label>
-                  <div className="relative">
-                    <Smartphone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                      type="text" 
-                      value={formData.image || ''}
-                      onChange={(e) => setFormData({...formData, image: e.target.value})}
-                      className="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-3 text-[10px] outline-none focus:ring-2 focus:ring-primary/10"
-                      placeholder="URL directe de l'image (https://...)"
-                    />
-                  </div>
+                  <GitHubImageUpload 
+                    value={formData.image || ''}
+                    onChange={(val) => setFormData({...formData, image: val})}
+                    placeholder="URL directe de l'image (https://...)"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Source / Crédit Photo</label>
@@ -2619,11 +2719,9 @@ export const AdminEditor = ({
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Image Partage Social</label>
-                  <input 
-                    type="text" 
+                  <GitHubImageUpload 
                     value={formData.socialImage || ''}
-                    onChange={(e) => setFormData({...formData, socialImage: e.target.value})}
-                    className="w-full bg-slate-50 rounded-xl px-4 py-3 text-[10px] outline-none focus:ring-2 focus:ring-primary/10"
+                    onChange={(val) => setFormData({...formData, socialImage: val})}
                     placeholder="URL image Facebook/Twitter"
                   />
                 </div>
@@ -2784,16 +2882,13 @@ const LiveUpdateEditor = ({ update, onSave, onCancel }: { update: Partial<LiveUp
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
            <div className="space-y-1">
               <label className="text-[9px] font-black uppercase text-slate-400 px-2">Lien Image (Optionnel)</label>
-              <div className="relative">
-                <Camera className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={12} />
-                <input 
-                  type="text"
-                  placeholder="https://... (image)"
-                  className="w-full bg-white rounded-xl pl-9 pr-4 py-2.5 text-xs font-bold outline-none border border-slate-100"
-                  value={formData.imageUrl}
-                  onChange={e => setFormData({...formData, imageUrl: e.target.value, type: e.target.value ? 'media' : formData.type})}
-                />
-              </div>
+              <GitHubImageUpload 
+                value={formData.imageUrl || ''}
+                onChange={(val) => setFormData({...formData, imageUrl: val, type: val ? 'media' : formData.type})}
+                placeholder="https://... (image)"
+                icon={Camera}
+                inputClassName="bg-white border border-slate-100 py-2.5"
+              />
            </div>
            <div className="space-y-1">
               <label className="text-[9px] font-black uppercase text-slate-400 px-2">Lien Vidéo YouTube (Optionnel)</label>
@@ -3056,12 +3151,10 @@ export const WebTVEditor = ({ video, onSave, onCancel, categories }: { video: Pa
            </div>
            <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-slate-400 px-2">Lien Miniature (Vignette)</label>
-              <input 
-                type="text"
+              <GitHubImageUpload 
+                value={formData.thumbnail || ''}
+                onChange={(val) => setFormData({...formData, thumbnail: val})}
                 placeholder="https://... (image)"
-                className="w-full bg-slate-50 rounded-2xl px-6 py-4 text-sm font-bold outline-none border border-slate-100"
-                value={formData.thumbnail}
-                onChange={e => setFormData({...formData, thumbnail: e.target.value})}
               />
            </div>
         </div>
