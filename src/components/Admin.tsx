@@ -2179,7 +2179,7 @@ export const AdminEditor = ({
     id: data.id || crypto.randomUUID(),
     slug: data.slug || '',
     title: data.title || '',
-    date: data.date || new Date().toISOString().split('T')[0],
+    date: data.date || new Date().toISOString(),
     image: data.image || '',
     video: data.video || '',
     excerpt: data.excerpt || '',
@@ -2592,7 +2592,7 @@ export const AdminEditor = ({
                       value={formatForInput(formData.date, 'date')}
                       onChange={(e) => {
                         const sanitized = sanitizeDateInput(e.target.value);
-                        setFormData({...formData, date: sanitized || null});
+                        setFormData({...formData, date: sanitized || new Date().toISOString()});
                       }}
                       className="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-3 text-xs outline-none focus:ring-2 focus:ring-primary/10"
                     />
@@ -3028,7 +3028,7 @@ export const LiveBlogEditor = ({ blog, onSave, onCancel }: { blog: Partial<LiveB
                 value={(formData.createdAt || '').split('T')[0]} 
                 onChange={e => {
                   const sanitized = e.target.value ? e.target.value.replace(/[٠-٩]/g, (d:any) => (d.charCodeAt(0) - 1632).toString()).replace(/[۰-۹]/g, (d:any) => (d.charCodeAt(0) - 1776).toString()) : null;
-                  setFormData({...formData, createdAt: sanitized ? new Date(sanitized).toISOString() : null});
+                  setFormData({...formData, createdAt: sanitized ? new Date(sanitized).toISOString() : new Date().toISOString()});
                 }}
                 className="w-full bg-slate-50 rounded-2xl px-6 py-3 text-xs font-bold outline-none border border-slate-100"
               />
@@ -3172,7 +3172,7 @@ export const WebTVEditor = ({ video, onSave, onCancel, categories }: { video: Pa
                 value={(formData.date || '').split('T')[0]} 
                 onChange={e => {
                   const sanitized = e.target.value ? e.target.value.replace(/[٠-٩]/g, (d:any) => (d.charCodeAt(0) - 1632).toString()).replace(/[۰-۹]/g, (d:any) => (d.charCodeAt(0) - 1776).toString()) : null;
-                  setFormData({...formData, date: sanitized ? new Date(sanitized).toISOString() : null});
+                  setFormData({...formData, date: sanitized ? new Date(sanitized).toISOString() : new Date().toISOString()});
                 }}
                 className="w-full bg-slate-50 rounded-2xl px-6 py-3 text-xs font-bold outline-none border border-slate-100"
               />
