@@ -2210,6 +2210,29 @@ export const AdminEditor = ({
     }),
     ...data
   });
+
+  // Helper to ensure dates are in correct format for inputs and in ASCII
+  const formatForInput = (d: string | null | undefined, inputType: 'date' | 'datetime-local') => {
+    if (!d) return '';
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return '';
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    if (inputType === 'date') return `${year}-${month}-${day}`;
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const sanitizeDateInput = (val: string | null) => {
+    if (!val) return null;
+    // Replace Arabic-Indic digits with Western digits
+    return val.replace(/[٠-٩]/g, (d) => (d.charCodeAt(0) - 1632).toString())
+              .replace(/[۰-۹]/g, (d) => (d.charCodeAt(0) - 1776).toString());
+  };
   
   const [previewMode, setPreviewMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -2532,8 +2555,11 @@ export const AdminEditor = ({
                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Planifier pour le (Optionnel)</label>
                   <input 
                     type="datetime-local" 
-                    value={formData.scheduledAt || ''}
-                    onChange={(e) => setFormData({...formData, scheduledAt: e.target.value || null})}
+                    value={formatForInput(formData.scheduledAt, 'datetime-local')}
+                    onChange={(e) => {
+                      const sanitized = sanitizeDateInput(e.target.value);
+                      setFormData({...formData, scheduledAt: sanitized || null});
+                    }}
                     className="w-full bg-slate-50 rounded-xl px-4 py-3 text-[10px] outline-none focus:ring-2 focus:ring-primary/10"
                   />
                 </div>
@@ -2563,8 +2589,11 @@ export const AdminEditor = ({
                     <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input 
                       type="date" 
-                      value={formData.date}
-                      onChange={(e) => setFormData({...formData, date: e.target.value || null})}
+                      value={formatForInput(formData.date, 'date')}
+                      onChange={(e) => {
+                        const sanitized = sanitizeDateInput(e.target.value);
+                        setFormData({...formData, date: sanitized || null});
+                      }}
                       className="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-3 text-xs outline-none focus:ring-2 focus:ring-primary/10"
                     />
                   </div>
@@ -2997,7 +3026,10 @@ export const LiveBlogEditor = ({ blog, onSave, onCancel }: { blog: Partial<LiveB
               <input 
                 type="date" 
                 value={(formData.createdAt || '').split('T')[0]} 
-                onChange={e => setFormData({...formData, createdAt: e.target.value ? new Date(e.target.value).toISOString() : null})}
+                onChange={e => {
+                  const sanitized = e.target.value ? e.target.value.replace(/[٠-٩]/g, (d:any) => (d.charCodeAt(0) - 1632).toString()).replace(/[۰-۹]/g, (d:any) => (d.charCodeAt(0) - 1776).toString()) : null;
+                  setFormData({...formData, createdAt: sanitized ? new Date(sanitized).toISOString() : null});
+                }}
                 className="w-full bg-slate-50 rounded-2xl px-6 py-3 text-xs font-bold outline-none border border-slate-100"
               />
            </div>
@@ -3138,7 +3170,10 @@ export const WebTVEditor = ({ video, onSave, onCancel, categories }: { video: Pa
               <input 
                 type="date" 
                 value={(formData.date || '').split('T')[0]} 
-                onChange={e => setFormData({...formData, date: e.target.value ? new Date(e.target.value).toISOString() : null})}
+                onChange={e => {
+                  const sanitized = e.target.value ? e.target.value.replace(/[٠-٩]/g, (d:any) => (d.charCodeAt(0) - 1632).toString()).replace(/[۰-۹]/g, (d:any) => (d.charCodeAt(0) - 1776).toString()) : null;
+                  setFormData({...formData, date: sanitized ? new Date(sanitized).toISOString() : null});
+                }}
                 className="w-full bg-slate-50 rounded-2xl px-6 py-3 text-xs font-bold outline-none border border-slate-100"
               />
            </div>

@@ -54,10 +54,56 @@ export const SupabaseService = {
       localStorage.setItem('akwaba_articles', JSON.stringify(articles));
       return;
     }
+
+    // Clean up dates to ensure they are ASCII and valid for PG
+    const cleanArticle = { ...article };
+    const sanitizeDate = (d: any) => {
+      if (!d) return null;
+      if (typeof d !== 'string') return d;
+      // Convert Arabic-Indic digits to ASCII
+      let s = d.replace(/[٠-٩]/g, (digit) => (digit.charCodeAt(0) - 1632).toString())
+               .replace(/[۰-۹]/g, (digit) => (digit.charCodeAt(0) - 1776).toString());
+      // Ensure it can be parsed as a date, fallback to null if too weird
+      const dateTest = new Date(s);
+      return isNaN(dateTest.getTime()) ? null : dateTest.toISOString();
+    };
+
+    if (cleanArticle.date) cleanArticle.date = sanitizeDate(cleanArticle.date) || new Date().toISOString();
+    if (cleanArticle.scheduledAt) cleanArticle.scheduledAt = sanitizeDate(cleanArticle.scheduledAt);
+
     const { error } = await supabase
       .from('articles')
-      .upsert(article);
+      .upsert(cleanArticle);
     
+    if (error) throw error;
+  },
+
+  async saveEvent(event: Event): Promise<void> {
+    if (isPlaceholder) {
+      const events = JSON.parse(localStorage.getItem('akwaba_events') || '[]');
+      const index = events.findIndex((e: any) => e.id === event.id);
+      if (index >= 0) events[index] = event;
+      else events.unshift(event);
+      localStorage.setItem('akwaba_events', JSON.stringify(events));
+      return;
+    }
+
+    // Clean up dates
+    const cleanEvent = { ...event };
+    const sanitizeDate = (d: any) => {
+      if (!d) return null;
+      if (typeof d !== 'string') return d;
+      let s = d.replace(/[٠-٩]/g, (digit) => (digit.charCodeAt(0) - 1632).toString())
+               .replace(/[۰-۹]/g, (digit) => (digit.charCodeAt(0) - 1776).toString());
+      const dateTest = new Date(s);
+      return isNaN(dateTest.getTime()) ? null : dateTest.toISOString();
+    };
+
+    if (cleanEvent.scheduledAt) cleanEvent.scheduledAt = sanitizeDate(cleanEvent.scheduledAt);
+
+    const { error } = await supabase
+      .from('events')
+      .upsert(cleanEvent);
     if (error) throw error;
   },
 
@@ -83,14 +129,6 @@ export const SupabaseService = {
       .order('date', { ascending: false });
     if (error) return [];
     return data as Event[];
-  },
-
-  async saveEvent(event: Event): Promise<void> {
-    if (isPlaceholder) return;
-    const { error } = await supabase
-      .from('events')
-      .upsert(event);
-    if (error) throw error;
   },
 
   async deleteEvent(id: string): Promise<void> {
