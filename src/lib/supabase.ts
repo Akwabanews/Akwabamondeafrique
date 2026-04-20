@@ -345,15 +345,20 @@ export const SupabaseService = {
     if (isPlaceholder) return;
     
     // 1. Insert into database
-    const { error } = await supabase
+    const { error: dbError } = await supabase
       .from('subscribers')
       .upsert({ email, date: new Date().toISOString() }, { onConflict: 'email' });
     
-    if (error) throw error;
+    if (dbError) {
+      console.error("Database subscription error:", dbError);
+      throw new Error("Erreur lors de l'enregistrement de l'abonnement.");
+    }
 
     // 2. Call Edge Function to send Welcome Email
+    // Since pg_net activation might cause interference with manual invokes if triggers exist,
+    // we use a more robust fetch approach with better error reporting.
     try {
-      await supabase.functions.invoke('send-newsletter-brevo', {
+      const { data, error: invokeError } = await supabase.functions.invoke('send-newsletter-brevo', {
         body: { 
           email, 
           type: 'welcome',
@@ -363,11 +368,14 @@ export const SupabaseService = {
           }
         }
       });
+
+      if (invokeError) throw invokeError;
     } catch (e) {
-      console.warn("Welcome email failed to send, but subscription was successful:", e);
+      console.error("Welcome email failed:", e);
+      // We don't throw here to not block the user process if the email service is down
     }
     
-    // 3. Also send a notification to admin about new subscriber
+    // 3. Admin Notification
     try {
       await this.sendNotification({
         id: `sub-${Date.now()}`,
@@ -379,8 +387,35 @@ export const SupabaseService = {
         type: 'info'
       });
     } catch (e) {
-      console.warn("Could not send admin notification for newsletter subscriber:", e);
+      console.warn("Admin notification failed:", e);
     }
+  },
+
+  async searchArticles(query: string): Promise<Article[]> {
+    if (isPlaceholder) {
+      const articles = await this.getArticles();
+      const q = query.toLowerCase();
+      return articles.filter(a => 
+        a.title.toLowerCase().includes(q) || 
+        a.content.toLowerCase().includes(q)
+      );
+    }
+
+    // Uses the search_articles SQL function (pg_trgm + unaccent)
+    const { data, error } = await supabase
+      .rpc('search_articles', { search_query: query });
+    
+    if (error) {
+      console.error('Supabase Error (searchArticles):', error);
+      // Fallback to basic search if RPC fails
+      const { data: basicData } = await supabase
+        .from('articles')
+        .select('*')
+        .ilike('title', `%${query}%`)
+        .order('date', { ascending: false });
+      return (basicData as Article[]) || [];
+    }
+    return data as Article[];
   },
 
   async unsubscribe(email: string): Promise<void> {

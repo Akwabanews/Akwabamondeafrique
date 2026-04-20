@@ -80,6 +80,7 @@ serve(async (req) => {
       `
     }
 
+    // Note: We use native fetch here as requested, avoiding pg_net conflicts in the Edge Function environment.
     const response = await fetch(BREVO_API_URL, {
       method: 'POST',
       headers: {

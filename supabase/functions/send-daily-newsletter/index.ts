@@ -31,17 +31,16 @@ serve(async (req) => {
     if (artError) throw artError
 
     // 3. Send emails to each subscriber
-    // We call the other edge function or call Brevo directly here to avoid timeout issues with 1000s of emails
-    // For simplicity, we'll iterate and call the Brevo function or trigger it.
-    // In a real prod environment, we would use a queue or Brevo's campaign API.
+    // Optimization: This function can be triggered by pg_cron for automated daily delivery.
+    // We iterate and trigger the specific email sending function.
     
-    const siteUrl = 'https://akwabainfo.com' // Should be an env var
+    const siteUrl = Deno.env.get('SITE_URL') || 'https://akwabainfo.com'
     
     const sendResults = await Promise.all(subscribers.map(async (sub) => {
       try {
         const unsubscribeUrl = `${siteUrl}/unsubscribe?email=${encodeURIComponent(sub.email)}`
         
-        // We trigger the send-newsletter-brevo function for each subscriber
+        // Triggering the brevo function via HTTP fetch (standard in Edge Functions)
         const res = await fetch(`${SUPABASE_URL}/functions/v1/send-newsletter-brevo`, {
           method: 'POST',
           headers: {
@@ -60,7 +59,7 @@ serve(async (req) => {
         })
         return res.ok
       } catch (e) {
-        console.error(`Failed to send to ${sub.email}`, e)
+        console.error(`Error with ${sub.email}`, e)
         return false
       }
     }))
