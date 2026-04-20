@@ -698,6 +698,18 @@ export const SupabaseService = {
     return false;
   },
 
+  async notifyAdminPayment(data: { email: string; amount: number; method: string; type: string; date: string; adminUrl: string }): Promise<void> {
+    if (isPlaceholder) return;
+    try {
+      const { error } = await supabase.functions.invoke('notify-admin-payment', {
+        body: data
+      });
+      if (error) console.error("[SupabaseService] Erreur lors de la notification admin:", error);
+    } catch (e) {
+      console.error("[SupabaseService] Exception notifyAdminPayment:", e);
+    }
+  },
+
   async upgradeToPremium(userId: string, method?: string, months: number = 1): Promise<void> {
     if (isPlaceholder) return;
     const now = new Date();

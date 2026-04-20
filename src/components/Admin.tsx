@@ -366,6 +366,7 @@ export const AdminDashboard = ({
   onLogout,
   onGenerateCode,
   setActiveNotification,
+  initialTab,
   liveBlogs,
   onEditLiveBlog,
   onCreateLiveBlog,
@@ -407,10 +408,11 @@ export const AdminDashboard = ({
   onSaveSettings: (s: SiteSettings) => void,
   onLogout: () => void,
   onGenerateCode: () => void,
+  initialTab?: string,
   setActiveNotification?: (n: { message: string, type: 'success' | 'urgent' | 'info' } | null) => void
 }) => {
   const [activeTab, setActiveTab] = useState<'articles' | 'events' | 'comments' | 'subscribers' | 'media' | 'settings' | 'analytics' | 'alerts' | 'support' | 'polls' | 'premium' | 'payments' | 'live-blog' | 'web-tv'>(
-    (localStorage.getItem('akwaba_admin_tab') as any) || 'articles'
+    initialTab as any || (localStorage.getItem('akwaba_admin_tab') as any) || 'articles'
   );
 
   useEffect(() => {
@@ -420,6 +422,12 @@ export const AdminDashboard = ({
       console.warn("LocalStorage save error:", e);
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab as any);
+    }
+  }, [initialTab]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [tempSettings, setTempSettings] = useState<SiteSettings>(settings || {

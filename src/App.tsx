@@ -2019,6 +2019,7 @@ export default function App() {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [showClassifiedsModal, setShowClassifiedsModal] = useState(false);
   const [adminStats, setAdminStats] = useState<any>(null);
+  const [adminActiveTab, setAdminActiveTab] = useState<string>('articles');
   
   // New features state
   const [showFilters, setShowFilters] = useState(false);
@@ -2703,28 +2704,64 @@ export default function App() {
     }
   };
 
+  const handleConfirmPayment = async (amount: number, method: string, type: 'subscription' | 'donation') => {
+    if (!currentUser) return;
+
+    const date = new Date().toLocaleString('fr-FR');
+    const adminUrl = `${window.location.origin}/admin?tab=premium`;
+
+    try {
+      // 1. Supabase Notification for Admin
+      await SupabaseService.sendNotification({
+        id: crypto.randomUUID(),
+        userId: 'global',
+        title: "💰 Nouveau paiement en attente",
+        message: `${currentUser.email} a déclaré avoir payé ${amount} FCFA via ${method}`,
+        type: 'urgent',
+        link: "/admin?tab=premium",
+        date: new Date().toISOString(),
+        read: false
+      });
+
+      // 2. Email Notification to Admin
+      await SupabaseService.notifyAdminPayment({
+        email: currentUser.email,
+        amount,
+        method,
+        type: type === 'subscription' ? 'Abonnement Premium' : 'Donation',
+        date,
+        adminUrl
+      });
+
+      // 3. Record Transaction as PENDING
+      await SupabaseService.recordTransaction(
+        currentUser.uid,
+        currentUser.email,
+        amount,
+        method,
+        type,
+        'pending'
+      );
+
+      // 4. Success Message to User
+      setActiveNotification({ 
+        message: "Merci ! Votre paiement est en cours de vérification. Vous recevrez un email dès que votre compte sera activé (délai maximum 2h).", 
+        type: 'success' 
+      });
+    } catch (error) {
+      console.error("[App] Confirmation payment error:", error);
+      setActiveNotification({ message: "Erreur lors de la confirmation. Veuillez réessayer.", type: 'urgent' });
+    }
+  };
+
   const handleUpgradePremium = async (method: string) => {
     if (!currentUser) {
       handleUserLogin();
       return;
     }
     
-    // Check for custom payment link
-    const payLink = siteSettings.paymentLinks?.[method];
-    if (payLink) {
-       setActiveNotification({ message: "Redirection vers le portail de paiement...", type: 'info' });
-       setTimeout(() => {
-         window.location.href = payLink;
-       }, 1500);
-       return;
-    }
-
-    // For manual methods or methods without link, we just show instructions in the modal
-    // We do NOT call upgradeToPremium here anymore.
-    setActiveNotification({ 
-      message: "Veuillez effectuer le paiement via " + method + " pour activer votre abonnement.", 
-      type: 'info' 
-    });
+    await handleConfirmPayment(siteSettings.premiumPrice, method, 'subscription');
+    setShowPremiumModal(false);
   };
 
   const handleBookmarkArticle = async (articleId: string) => {
@@ -3741,8 +3778,15 @@ export default function App() {
                           onClose={() => setShowNotificationCenter(false)}
                           onMarkRead={handleMarkNotificationAsRead}
                           onNavigate={(link) => {
-                            const article = adminArticles.find(a => a.id === link || a.slug === link);
-                            if (article) handleArticleClick(article);
+                            if (link.startsWith('/admin')) {
+                              const url = new URL(link, window.location.origin);
+                              const tab = url.searchParams.get('tab');
+                              if (tab) setAdminActiveTab(tab);
+                              navigateTo('admin');
+                            } else {
+                              const article = adminArticles.find(a => a.id === link || a.slug === link);
+                              if (article) handleArticleClick(article);
+                            }
                             setShowNotificationCenter(false);
                           }}
                         />
@@ -4780,27 +4824,13 @@ export default function App() {
                     <button 
                       onClick={() => {
                         const amountVal = parseInt(selectedAmount) || 0;
-                        const payLink = siteSettings.paymentLinks?.[selectedPayment];
-                        
-                        // Record transaction in DB
-                        SupabaseService.recordTransaction(
-                          currentUser?.uid || 'anonymous',
-                          currentUser?.email || 'visiteur@anonyme.com',
-                          amountVal,
-                          selectedPayment,
-                          'donation',
-                          'success' // We assume success if no payLink, or pending if redirect
-                        );
-
-                        if (payLink) {
-                          window.location.href = payLink;
-                        } else {
-                          setDonationSuccess(true);
-                        }
+                        handleConfirmPayment(amountVal, selectedPayment, 'donation').then(() => {
+                           setDonationSuccess(true);
+                        });
                       }}
                       className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-lg shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                     >
-                      CONFIRMER MON DON DE {selectedAmount} F
+                      ✅ J'AI PAYÉ, CONFIRMER MON DON
                       <Heart size={20} fill="currentColor" />
                     </button>
                   </div>
@@ -5221,6 +5251,7 @@ Dernière mise à jour : Avril 2026
                   polls={adminPolls}
                   liveBlogs={adminLiveBlogs}
                   webTV={adminWebTV}
+                  initialTab={adminActiveTab}
                   onEditArticle={(a) => setEditingArticle(a)}
                   onEditEvent={(e) => setEditingEvent(e)}
                   onEditPoll={(p) => setEditingPoll(p)}
@@ -5547,15 +5578,11 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                   <div className="space-y-4">
                      <button 
                       onClick={() => {
-                        if (hasDirectLink) {
-                          onUpgrade(selectedMethod);
-                        } else {
-                          setPaymentInitiated(true);
-                        }
+                        setPaymentInitiated(true);
                       }}
                       className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest shadow-2xl hover:bg-primary transition-all flex items-center justify-center gap-3 group"
                     >
-                      {hasDirectLink ? "PAYER MAINTENANT" : "CONTINUER VERS LE PAIEMENT"}
+                      VOIR LES INSTRUCTIONS DE PAIEMENT
                       <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
                     </button>
                     <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 font-bold italic">
@@ -5598,12 +5625,11 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                        </button>
                        <button 
                         onClick={() => {
-                          onClose();
-                          // Navigate to support or contact if possible
+                          onUpgrade(selectedMethod);
                         }}
-                        className="py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all"
+                        className="py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all text-center flex items-center justify-center"
                        >
-                         D'ACCORD
+                         ✅ J'AI PAYÉ, ACTIVER MON COMPTE
                        </button>
                     </div>
                   </div>
