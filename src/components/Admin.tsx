@@ -107,7 +107,7 @@ export const PollEditor = ({ poll, onSave, onCancel }: { poll: Partial<Poll>, on
       { id: '2', text: '', votes: 0 }
     ],
     startDate: poll.startDate || new Date().toISOString().split('T')[0],
-    endDate: poll.endDate || '',
+    endDate: poll.endDate || null,
     active: poll.active !== undefined ? poll.active : true
   });
 
@@ -201,8 +201,8 @@ export const PollEditor = ({ poll, onSave, onCancel }: { poll: Partial<Poll>, on
             <label className="text-xs font-black uppercase tracking-widest text-slate-400 px-2 italic">Date de début</label>
             <input 
               type="date"
-              value={formData.startDate.split('T')[0]}
-              onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+              value={(formData.startDate || '').split('T')[0]}
+              onChange={(e) => setFormData({...formData, startDate: e.target.value || null})}
               className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-sm font-bold outline-none"
             />
           </div>
@@ -2050,7 +2050,7 @@ export const AdminEditor = ({
     seoDescription: data.seoDescription || '',
     socialImage: data.socialImage || '',
     status: data.status || 'published',
-    scheduledAt: data.scheduledAt || '',
+    scheduledAt: data.scheduledAt || null,
     audioUrl: data.audioUrl || '',
     gallery: data.gallery || [],
     isPremium: data.isPremium || false,
@@ -2394,7 +2394,7 @@ export const AdminEditor = ({
                   <input 
                     type="datetime-local" 
                     value={formData.scheduledAt || ''}
-                    onChange={(e) => setFormData({...formData, scheduledAt: e.target.value})}
+                    onChange={(e) => setFormData({...formData, scheduledAt: e.target.value || null})}
                     className="w-full bg-slate-50 rounded-xl px-4 py-3 text-[10px] outline-none focus:ring-2 focus:ring-primary/10"
                   />
                 </div>
@@ -2425,7 +2425,7 @@ export const AdminEditor = ({
                     <input 
                       type="date" 
                       value={formData.date}
-                      onChange={(e) => setFormData({...formData, date: e.target.value})}
+                      onChange={(e) => setFormData({...formData, date: e.target.value || null})}
                       className="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-3 text-xs outline-none focus:ring-2 focus:ring-primary/10"
                     />
                   </div>
@@ -2867,8 +2867,8 @@ export const LiveBlogEditor = ({ blog, onSave, onCancel }: { blog: Partial<LiveB
               <label className="text-[10px] font-black uppercase text-slate-400 px-2">Date d'initialisation</label>
               <input 
                 type="date" 
-                value={formData.createdAt.split('T')[0]} 
-                onChange={e => setFormData({...formData, createdAt: new Date(e.target.value).toISOString()})}
+                value={(formData.createdAt || '').split('T')[0]} 
+                onChange={e => setFormData({...formData, createdAt: e.target.value ? new Date(e.target.value).toISOString() : null})}
                 className="w-full bg-slate-50 rounded-2xl px-6 py-3 text-xs font-bold outline-none border border-slate-100"
               />
            </div>
@@ -3008,8 +3008,8 @@ export const WebTVEditor = ({ video, onSave, onCancel, categories }: { video: Pa
               <label className="text-[10px] font-black uppercase text-slate-400 px-2">Date de publication</label>
               <input 
                 type="date" 
-                value={formData.date.split('T')[0]} 
-                onChange={e => setFormData({...formData, date: new Date(e.target.value).toISOString()})}
+                value={(formData.date || '').split('T')[0]} 
+                onChange={e => setFormData({...formData, date: e.target.value ? new Date(e.target.value).toISOString() : null})}
                 className="w-full bg-slate-50 rounded-2xl px-6 py-3 text-xs font-bold outline-none border border-slate-100"
               />
            </div>
