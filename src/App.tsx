@@ -2993,9 +2993,10 @@ export default function App() {
         type: 'success' 
       });
       setNewsletterEmail('');
-    } catch (error) {
-      console.error("Newsletter error:", error);
-      alert("Une erreur est survenue lors de l'inscription.");
+    } catch (error: any) {
+      console.error("Newsletter error detail:", error);
+      const msg = error.message || "Une erreur est survenue lors de l'inscription.";
+      alert(msg);
     }
   };
 
@@ -5383,8 +5384,8 @@ Dernière mise à jour : Avril 2026
                       setNewsletterEmail('');
                       setActiveNotification({ message: "Inscription réussie ! Merci d'avoir rejoint Akwaba Info.", type: 'success' });
                       setTimeout(() => setActiveNotification(null), 5000);
-                    } catch (e) {
-                      alert("Erreur lors de l'inscription.");
+                    } catch (e: any) {
+                      alert(e.message || "Erreur lors de l'inscription.");
                     }
                   } else {
                     alert("Veuillez entrer un email valide.");

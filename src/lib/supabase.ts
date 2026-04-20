@@ -345,20 +345,19 @@ export const SupabaseService = {
     if (isPlaceholder) return;
     
     // 1. Insert into database
+    // We use a simpler insert/upsert and handle existing emails gracefully
     const { error: dbError } = await supabase
       .from('subscribers')
-      .upsert({ email, date: new Date().toISOString() }, { onConflict: 'email' });
+      .upsert({ email }, { onConflict: 'email' });
     
-    if (dbError) {
+    if (dbError && dbError.code !== '23505') {
       console.error("Database subscription error:", dbError);
-      throw new Error("Erreur lors de l'enregistrement de l'abonnement.");
+      throw new Error(`Erreur Base de données: ${dbError.message}`);
     }
 
     // 2. Call Edge Function to send Welcome Email
-    // Since pg_net activation might cause interference with manual invokes if triggers exist,
-    // we use a more robust fetch approach with better error reporting.
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('send-newsletter-brevo', {
+      const { error: invokeError } = await supabase.functions.invoke('send-newsletter-brevo', {
         body: { 
           email, 
           type: 'welcome',
@@ -370,9 +369,9 @@ export const SupabaseService = {
       });
 
       if (invokeError) throw invokeError;
-    } catch (e) {
-      console.error("Welcome email failed:", e);
-      // We don't throw here to not block the user process if the email service is down
+    } catch (e: any) {
+      console.warn("Welcome email failed but subscription might be OK:", e);
+      // Don't throw for email failure if DB insert worked
     }
     
     // 3. Admin Notification
