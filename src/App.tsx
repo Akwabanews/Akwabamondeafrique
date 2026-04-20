@@ -5243,6 +5243,7 @@ Dernière mise à jour : Avril 2026
                   onSaveSettings={handleSaveSettings}
                   onLogout={handleAdminLogout}
                   onGenerateCode={() => setShowExportModal(true)}
+                  setActiveNotification={setActiveNotification}
                   stats={adminStats}
                 />
               )

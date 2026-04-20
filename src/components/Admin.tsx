@@ -260,6 +260,7 @@ export const AdminDashboard = ({
   onSaveSettings,
   onLogout,
   onGenerateCode,
+  setActiveNotification,
   liveBlogs,
   onEditLiveBlog,
   onCreateLiveBlog,
@@ -300,7 +301,8 @@ export const AdminDashboard = ({
   onBlockUser: (userId: string) => void,
   onSaveSettings: (s: SiteSettings) => void,
   onLogout: () => void,
-  onGenerateCode: () => void
+  onGenerateCode: () => void,
+  setActiveNotification?: (n: { message: string, type: 'success' | 'urgent' | 'info' } | null) => void
 }) => {
   const [activeTab, setActiveTab] = useState<'articles' | 'events' | 'comments' | 'subscribers' | 'media' | 'settings' | 'analytics' | 'alerts' | 'support' | 'polls' | 'premium' | 'payments' | 'live-blog' | 'web-tv'>(
     (localStorage.getItem('akwaba_admin_tab') as any) || 'articles'
@@ -346,6 +348,7 @@ export const AdminDashboard = ({
   });
   const [newCategory, setNewCategory] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Sync tempSettings when props change
   useEffect(() => {
@@ -387,10 +390,12 @@ export const AdminDashboard = ({
     }, 15000);
 
     try {
-      await onSaveSettings(tempSettings);
+      if (onSaveSettings) {
+        await onSaveSettings(tempSettings);
+      }
       // Success is handled by the parent's notification system
     } catch (e: any) {
-      console.error(e);
+      console.error("[AdminDashboard] Error saving settings:", e);
       alert("Une erreur est survenue lors de la sauvegarde : " + (e.message || "Erreur inconnue"));
     } finally {
       clearTimeout(safetyTimer);
@@ -785,20 +790,41 @@ export const AdminDashboard = ({
                 </p>
                 <div className="pt-2">
                   <button 
+                    disabled={isImporting}
                     onClick={async () => {
                       if (confirm("Importer les articles et événements de démonstration vers Supabase ? Cela n'effacera pas vos articles existants.")) {
+                        setIsImporting(true);
                         try {
                           await SupabaseService.importMockData(MOCK_ARTICLES, MOCK_EVENTS);
-                          alert("Données importées avec succès ! Rafraîchissez la page pour voir les changements.");
-                          window.location.reload();
+                          if (setActiveNotification) {
+                            setActiveNotification({ message: "Données importées avec succès ! Rafraîchissez la page.", type: 'success' });
+                            setTimeout(() => setActiveNotification(null), 5000);
+                          } else {
+                            alert("Données importées avec succès ! Rafraîchissez la page.");
+                          }
+                          // Attendre un peu pour laisser l'utilisateur voir la notification
+                          setTimeout(() => {
+                            window.location.reload();
+                          }, 2000);
                         } catch (e: any) {
-                          alert("Erreur lors de l'import : " + e.message);
+                          console.error("[AdminDashboard] Import error:", e);
+                          if (setActiveNotification) {
+                            setActiveNotification({ message: "Erreur lors de l'import: " + (e.message || "Erreur inconnue"), type: 'urgent' });
+                            setTimeout(() => setActiveNotification(null), 5000);
+                          } else {
+                            alert("Erreur lors de l'import : " + e.message);
+                          }
+                        } finally {
+                          setIsImporting(false);
                         }
                       }
                     }}
-                    className="bg-orange-600 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-200 hover:scale-105 transition-all"
+                    className={cn(
+                      "bg-orange-600 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-orange-200 hover:scale-105 transition-all text-center flex items-center justify-center",
+                      isImporting && "opacity-50 cursor-not-allowed scale-100"
+                    )}
                   >
-                    Restaurer les données de démonstration (Cloud)
+                     {isImporting ? "Import en cours..." : "Restaurer les données de démonstration (Cloud)"}
                   </button>
                 </div>
               </div>

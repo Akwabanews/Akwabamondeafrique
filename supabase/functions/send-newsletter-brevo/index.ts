@@ -16,6 +16,15 @@ serve(async (req) => {
 
   try {
     const { email, type, data } = await req.json()
+    console.log(`[send-newsletter-brevo] Demande reçue pour ${email}, type: ${type}`);
+
+    if (!BREVO_API_KEY) {
+      console.error("[send-newsletter-brevo] BREVO_API_KEY est manquante dans les variables d'environnement !");
+      return new Response(JSON.stringify({ error: "Configuration manquante: BREVO_API_KEY non définie" }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      })
+    }
 
     let subject = ''
     let htmlContent = ''
@@ -81,6 +90,7 @@ serve(async (req) => {
     }
 
     // Note: We use native fetch here as requested, avoiding pg_net conflicts in the Edge Function environment.
+    console.log(`[send-newsletter-brevo] Appel de l'API Brevo...`);
     const response = await fetch(BREVO_API_URL, {
       method: 'POST',
       headers: {
@@ -97,6 +107,7 @@ serve(async (req) => {
     })
 
     const result = await response.json()
+    console.log(`[send-newsletter-brevo] Statut API Brevo: ${response.status}`, result);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

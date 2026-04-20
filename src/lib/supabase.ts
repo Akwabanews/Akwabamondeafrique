@@ -358,7 +358,8 @@ export const SupabaseService = {
 
     // 2. Call Edge Function to send Welcome Email
     try {
-      const { error: invokeError } = await supabase.functions.invoke('send-newsletter-brevo', {
+      console.log(`[SupabaseService] Envoi email de bienvenue à ${email}...`);
+      const { data: invokeData, error: invokeError } = await supabase.functions.invoke('send-newsletter-brevo', {
         body: { 
           email, 
           type: 'welcome',
@@ -369,8 +370,11 @@ export const SupabaseService = {
         }
       });
 
+      console.log(`[SupabaseService] Réponse Edge Function:`, invokeData);
+
       if (invokeError) throw invokeError;
     } catch (e: any) {
+      console.error("[SupabaseService] Erreur Edge Function:", e);
       console.warn("Welcome email failed but subscription might be OK:", e);
       // Don't throw for email failure if DB insert worked
     }
@@ -763,14 +767,29 @@ export const SupabaseService = {
   async importMockData(articles: Article[], events: Event[]): Promise<void> {
     if (isPlaceholder) return;
     
-    if (articles.length > 0) {
-      const { error: artError } = await supabase.from('articles').upsert(articles);
-      if (artError) throw artError;
-    }
+    console.log(`[SupabaseService] Début de l'import des données de démo (${articles.length} articles, ${events.length} évènements)...`);
     
-    if (events.length > 0) {
-      const { error: evtError } = await supabase.from('events').upsert(events);
-      if (evtError) throw evtError;
+    try {
+      if (articles.length > 0) {
+        const { error: artError } = await supabase.from('articles').upsert(articles);
+        if (artError) {
+          console.error("[SupabaseService] Erreur import articles:", artError);
+          throw artError;
+        }
+      }
+      
+      if (events.length > 0) {
+        const { error: evtError } = await supabase.from('events').upsert(events);
+        if (evtError) {
+          console.error("[SupabaseService] Erreur import évènements:", evtError);
+          throw evtError;
+        }
+      }
+      
+      console.log("[SupabaseService] Import réussi !");
+    } catch (error: any) {
+      console.error("[SupabaseService] ÉCHEC GLOBAL de l'import:", error);
+      throw new Error(`Échec de l'import: ${error.message || "Erreur inconnue"}`);
     }
   }
 };
