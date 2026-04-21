@@ -55,7 +55,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Article, Event, SiteSettings, Comment, Subscriber, MediaAsset, SupportMessage, Poll, UserProfile, LiveBlog, LiveUpdate, WebTV } from '../types';
+import { Article, Event, SiteSettings, Comment, Subscriber, MediaAsset, SupportMessage, Poll, UserProfile, LiveBlog, LiveUpdate, WebTV, Classified } from '../types';
 import { cn, optimizeImage } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
@@ -343,6 +343,7 @@ export const PollEditor = ({ poll, onSave, onCancel }: { poll: Partial<Poll>, on
 export const AdminDashboard = ({ 
   articles, 
   events,
+  classifieds,
   comments,
   subscribers,
   mediaLibrary,
@@ -352,12 +353,15 @@ export const AdminDashboard = ({
   onEditArticle,
   onEditEvent, 
   onEditPoll,
+  onEditClassified,
   onCreateArticle,
   onCreateEvent, 
   onCreatePoll,
+  onCreateClassified,
   onDeleteArticle,
   onDeleteEvent, 
   onDeletePoll,
+  onDeleteClassified,
   onDeleteComment,
   onDeleteSubscriber,
   onDeleteMedia,
@@ -365,6 +369,7 @@ export const AdminDashboard = ({
   onSaveSettings,
   onLogout,
   onGenerateCode,
+  onValidateTransaction,
   setActiveNotification,
   initialTab,
   liveBlogs,
@@ -378,6 +383,7 @@ export const AdminDashboard = ({
 }: { 
   articles: Article[], 
   events: Event[],
+  classifieds: Classified[],
   comments: Comment[],
   subscribers: Subscriber[],
   mediaLibrary: MediaAsset[],
@@ -391,16 +397,19 @@ export const AdminDashboard = ({
   onEditPoll: (p: Poll) => void,
   onEditLiveBlog: (l: LiveBlog) => void,
   onEditWebTV: (v: WebTV) => void,
+  onEditClassified: (c: Classified) => void,
   onCreateArticle: () => void,
   onCreateEvent: () => void,
   onCreatePoll: () => void,
   onCreateLiveBlog: () => void,
   onCreateWebTV: () => void,
+  onCreateClassified: () => void,
   onDeleteArticle: (id: string) => void,
   onDeleteEvent: (id: string) => void,
   onDeletePoll: (id: string) => void,
   onDeleteLiveBlog: (id: string) => void,
   onDeleteWebTV: (id: string) => void,
+  onDeleteClassified: (id: string) => void,
   onDeleteComment: (id: string) => void,
   onDeleteSubscriber: (id: string) => void,
   onDeleteMedia: (id: string) => void,
@@ -408,10 +417,11 @@ export const AdminDashboard = ({
   onSaveSettings: (s: SiteSettings) => void,
   onLogout: () => void,
   onGenerateCode: () => void,
+  onValidateTransaction?: (tid: string, uid: string) => Promise<void>,
   initialTab?: string,
   setActiveNotification?: (n: { message: string, type: 'success' | 'urgent' | 'info' } | null) => void
 }) => {
-  const [activeTab, setActiveTab] = useState<'articles' | 'events' | 'comments' | 'subscribers' | 'media' | 'settings' | 'analytics' | 'alerts' | 'support' | 'polls' | 'premium' | 'payments' | 'live-blog' | 'web-tv'>(
+  const [activeTab, setActiveTab] = useState<'articles' | 'events' | 'comments' | 'subscribers' | 'media' | 'settings' | 'analytics' | 'alerts' | 'support' | 'polls' | 'premium' | 'payments' | 'live-blog' | 'web-tv' | 'classifieds'>(
     initialTab as any || (localStorage.getItem('akwaba_admin_tab') as any) || 'articles'
   );
 
@@ -596,6 +606,13 @@ export const AdminDashboard = ({
   );
 
   const filteredSubscribers = subscribers.filter(s => s.email.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const filteredClassifieds = classifieds.filter(c => 
+    c.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.username.toLowerCase().includes(searchTerm.toLowerCase())
+  );
   const filteredMedia = mediaLibrary.filter(m => m.url.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
@@ -617,7 +634,7 @@ export const AdminDashboard = ({
           >
             <Copy size={18} /> EXPORT
           </button>
-          {(activeTab === 'articles' || activeTab === 'events' || activeTab === 'polls' || activeTab === 'live-blog' || activeTab === 'web-tv') && (
+          {(activeTab === 'articles' || activeTab === 'events' || activeTab === 'polls' || activeTab === 'live-blog' || activeTab === 'web-tv' || activeTab === 'classifieds') && (
             <button 
               onClick={() => {
                 if (activeTab === 'articles') onCreateArticle();
@@ -625,6 +642,7 @@ export const AdminDashboard = ({
                 else if (activeTab === 'polls') onCreatePoll();
                 else if (activeTab === 'live-blog') onCreateLiveBlog();
                 else if (activeTab === 'web-tv') onCreateWebTV();
+                else if (activeTab === 'classifieds') onCreateClassified();
               }}
               className="flex-1 md:flex-none px-6 py-4 bg-primary text-white font-black rounded-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 text-xs shadow-xl shadow-primary/20 border-2 border-white"
             >
@@ -688,6 +706,15 @@ export const AdminDashboard = ({
           )}
         >
           Web TV
+        </button>
+        <button 
+          onClick={() => setActiveTab('classifieds')}
+          className={cn(
+            "px-6 py-4 font-black transition-all border-b-2 shrink-0 text-sm",
+            activeTab === 'classifieds' ? "border-primary text-primary" : "border-transparent text-slate-400 hover:text-slate-600"
+          )}
+        >
+          Petites Annonces
         </button>
         <button 
           onClick={() => setActiveTab('comments')}
@@ -1317,7 +1344,7 @@ export const AdminDashboard = ({
                   </div>
                 </div>
                 
-                <TransactionsList />
+                <TransactionsList onValidate={onValidateTransaction} />
 
                 {/* Sticky Footer for save */}
                 <div className="sticky bottom-0 bg-white/80 backdrop-blur-md p-6 border-t border-slate-50 -mx-10 -mb-10 flex justify-end items-center gap-6">
@@ -1365,6 +1392,11 @@ export const AdminDashboard = ({
                     }}
                   />
                 </div>
+              </div>
+
+              <div className="pt-10">
+                <h4 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-4 px-2">Transactions & validations</h4>
+                <TransactionsList onValidate={onValidateTransaction} />
               </div>
             </motion.div>
           ) : activeTab === 'support' ? (
@@ -2039,8 +2071,49 @@ export const AdminDashboard = ({
                   </div>
                 ))}
 
+                {activeTab === 'classifieds' && filteredClassifieds.map(ad => (
+                  <div key={ad.id} className="grid grid-cols-12 px-6 py-4 items-center hover:bg-slate-50/50 transition-colors group">
+                    <div className="col-span-6 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 italic">
+                        {ad.imageUrl ? (
+                          <img src={ad.imageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-300">
+                             <ImagePlus size={20} />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 leading-tight line-clamp-1">{ad.title}</h4>
+                        <p className="text-[10px] text-slate-400 font-medium">Par {ad.username} • {ad.location}</p>
+                      </div>
+                    </div>
+                    <div className="col-span-2 text-xs font-bold text-slate-600 italic uppercase">
+                      {ad.category}
+                    </div>
+                    <div className="col-span-2 text-xs text-primary font-black">
+                      {ad.price || 'P.R.'}
+                    </div>
+                    <div className="col-span-2 flex justify-end gap-2 pr-2">
+                       <button 
+                        onClick={() => onEditClassified(ad)}
+                        className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => onDeleteClassified(ad.id)}
+                        className="p-2 bg-slate-50 text-slate-400 rounded-lg hover:bg-red-50 hover:text-red-500 transition-all opacity-70 lg:opacity-0 lg:group-hover:opacity-100"
+                      >
+                        <Trash size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
                 {((activeTab === 'articles' && filteredArticles.length === 0) || 
                   (activeTab === 'events' && filteredEvents.length === 0) || 
+                  (activeTab === 'classifieds' && filteredClassifieds.length === 0) ||
                   (activeTab === 'comments' && filteredComments.length === 0)) && (
                   <div className="py-20 text-center space-y-4">
                     <div className="p-4 bg-slate-50 w-20 h-20 rounded-full mx-auto flex items-center justify-center text-slate-200">
@@ -2095,23 +2168,36 @@ export const AdminDashboard = ({
   );
 };
 
-const TransactionsList = () => {
+const TransactionsList = ({ onValidate }: { onValidate?: (tid: string, uid: string) => Promise<void> }) => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchTransactions = async () => {
+    try {
+      const data = await SupabaseService.getTransactions();
+      setTransactions(data);
+    } catch (err) {
+      console.error("Error loading transactions:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        const data = await SupabaseService.getTransactions();
-        setTransactions(data);
-      } catch (err) {
-        console.error("Error loading transactions:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchTransactions();
   }, []);
+
+  const handleValidate = async (tid: string, uid: string) => {
+    if (!onValidate) return;
+    if (confirm("Valider ce paiement et activer l'accès premium ?")) {
+      try {
+        await onValidate(tid, uid);
+        fetchTransactions();
+      } catch (err) {
+        alert("Erreur lors de la validation.");
+      }
+    }
+  };
 
   if (loading) return <div className="p-10 text-center"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" /></div>;
 
@@ -2128,8 +2214,8 @@ const TransactionsList = () => {
           <div className="col-span-2">Montant</div>
           <div className="col-span-2">Type</div>
           <div className="col-span-2">Méthode</div>
-          <div className="col-span-2">Date</div>
-          <div className="col-span-1 text-right">Statut</div>
+          <div className="col-span-1">Date</div>
+          <div className="col-span-2 text-right">Statut / Actions</div>
         </div>
         <div className="divide-y divide-slate-100">
           {transactions.length === 0 ? (
@@ -2146,10 +2232,18 @@ const TransactionsList = () => {
                    )}>{t.type === 'subscription' ? 'Abonnement' : 'Don'}</span>
                 </div>
                 <div className="col-span-2 font-medium uppercase text-slate-400 tracking-tighter">{t.method}</div>
-                <div className="col-span-2 text-[10px] text-slate-400">{format(new Date(t.date), 'dd/MM HH:mm')}</div>
-                <div className="col-span-1 text-right">
+                <div className="col-span-1 text-[10px] text-slate-400">{format(new Date(t.date), 'dd/MM HH:mm')}</div>
+                <div className="col-span-2 text-right flex items-center justify-end gap-3">
+                   {t.status === 'pending' && t.type === 'subscription' && (
+                     <button 
+                        onClick={() => handleValidate(t.id, t.userId)}
+                        className="bg-emerald-500 text-white text-[9px] font-black px-3 py-1.5 rounded-lg hover:scale-105 transition-all shadow-lg shadow-emerald-500/20"
+                     >
+                       VALIDER
+                     </button>
+                   )}
                    <span className={cn(
-                     "inline-block w-2 h-2 rounded-full",
+                     "inline-block w-2.5 h-2.5 rounded-full",
                      t.status === 'success' ? "bg-emerald-500" : (t.status === 'failed' ? "bg-red-500" : "bg-amber-500")
                    )} title={t.status} />
                 </div>
@@ -2874,6 +2968,197 @@ export const AdminEditor = ({
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const ClassifiedEditor = ({ 
+  classified, 
+  onSave, 
+  onCancel 
+}: { 
+  classified: Classified, 
+  onSave: (c: Classified) => void, 
+  onCancel: () => void 
+}) => {
+  const [formData, setFormData] = useState<Classified>({ ...classified });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const validate = () => {
+    if (!formData.title || formData.title.length < 3) {
+      alert("Titre requis (min. 3 caractères).");
+      return false;
+    }
+    if (!formData.description || formData.description.length < 10) {
+      alert("Description requise (min. 10 caractères).");
+      return false;
+    }
+    if (!formData.contact) {
+      alert("Contact requis (téléphone ou email).");
+      return false;
+    }
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) return;
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de l'enregistrement.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto py-10 px-4 space-y-8 african-pattern p-10 rounded-[50px] bg-slate-50/30">
+      <div className="flex items-center justify-between">
+        <button 
+          onClick={onCancel}
+          className="flex items-center gap-2 text-slate-400 hover:text-slate-900 font-black transition-all text-sm uppercase tracking-widest"
+        >
+          <ArrowLeft size={18} /> RETOUR
+        </button>
+        <button 
+          onClick={handleSave}
+          disabled={isSaving}
+          className={cn(
+            "px-8 py-4 bg-primary text-white rounded-2xl flex items-center gap-2 font-black shadow-xl shadow-primary/20 transition-all text-xs uppercase tracking-widest border-2 border-white",
+            isSaving && "opacity-70 cursor-not-allowed"
+          )}
+        >
+          {isSaving ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Check size={18} />
+          )}
+          ENREGISTRER L'ANNONCE
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-6 bg-white p-8 rounded-3xl border border-slate-100 shadow-xl">
+          <h3 className="font-black text-lg underline decoration-primary decoration-4 underline-offset-4">Informations Principales</h3>
+          
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Titre de l'annonce</label>
+            <input 
+              type="text" 
+              value={formData.title}
+              onChange={e => setFormData({...formData, title: e.target.value})}
+              placeholder="Ex: iPhone 13 Pro Max - État Neuf"
+              className="w-full bg-slate-50 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/10"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Catégorie</label>
+              <select 
+                value={formData.category}
+                onChange={e => setFormData({...formData, category: e.target.value as any})}
+                className="w-full bg-slate-50 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/10"
+              >
+                <option value="divers">Divers</option>
+                <option value="emploi">Emploi</option>
+                <option value="immobilier">Immobilier</option>
+                <option value="véhicules">Véhicules</option>
+                <option value="services">Services</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Prix (Optionnel)</label>
+              <input 
+                type="text" 
+                value={formData.price || ''}
+                onChange={e => setFormData({...formData, price: e.target.value})}
+                placeholder="Ex: 500 000 F"
+                className="w-full bg-slate-50 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/10"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Description détaillée</label>
+            <textarea 
+              value={formData.description}
+              onChange={e => setFormData({...formData, description: e.target.value})}
+              placeholder="Décrivez votre article ou service..."
+              className="w-full bg-slate-50 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/10 min-h-[150px] resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl space-y-6">
+            <h3 className="font-black text-lg underline decoration-primary decoration-4 underline-offset-4">Médias & Contact</h3>
+            
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lien Image</label>
+              <GitHubImageUpload 
+                value={formData.imageUrl || ''}
+                onChange={val => setFormData({...formData, imageUrl: val})}
+                placeholder="Upload ou lien URL..."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Localisation</label>
+              <div className="relative">
+                <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                <input 
+                  type="text" 
+                  value={formData.location}
+                  onChange={e => setFormData({...formData, location: e.target.value})}
+                  placeholder="Ex: Cocody, Abidjan"
+                  className="w-full bg-slate-50 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Contact (Public)</label>
+              <div className="relative">
+                <Smartphone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" />
+                <input 
+                  type="text" 
+                  value={formData.contact}
+                  onChange={e => setFormData({...formData, contact: e.target.value})}
+                  placeholder="Numéro ou Email..."
+                  className="w-full bg-slate-50 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Statut</label>
+              <select 
+                value={formData.status}
+                onChange={e => setFormData({...formData, status: e.target.value as any})}
+                className="w-full bg-slate-50 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-primary/10"
+              >
+                <option value="active">Active</option>
+                <option value="sold">Vendu / Clôturé</option>
+                <option value="expired">Expiré</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 rounded-3xl p-6 text-white space-y-4">
+             <div className="flex items-center gap-2">
+                <Info size={16} className="text-primary" />
+                <p className="text-[10px] font-black uppercase tracking-widest">Conseils de publication</p>
+             </div>
+             <p className="text-[10px] text-slate-400 leading-relaxed">
+               Les annonces avec une image claire et un prix précis reçoivent 3x plus de contacts. 
+               Assurez-vous que vos informations de contact sont à jour.
+             </p>
           </div>
         </div>
       </div>

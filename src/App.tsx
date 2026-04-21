@@ -60,7 +60,8 @@ import {
   Radio,
   Shield,
   ShoppingBag,
-  Info
+  Info,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence, useScroll, useSpring } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
@@ -69,7 +70,7 @@ import { fr } from 'date-fns/locale';
 import { MOCK_ARTICLES, MOCK_EVENTS, MOCK_AUTHORS } from './constants';
 import { Article, Comment, Event, SiteSettings, Subscriber, MediaAsset, Poll, Classified, LiveBlog, AppNotification, SupportMessage, Author, WebTV } from './types';
 import { cn, optimizeImage, getYoutubeId } from './lib/utils';
-import { AdminLogin, AdminDashboard, AdminEditor, ExportModal, PollEditor, LiveBlogEditor, WebTVEditor } from './components/Admin';
+import { AdminLogin, AdminDashboard, AdminEditor, ExportModal, PollEditor, LiveBlogEditor, WebTVEditor, ClassifiedEditor } from './components/Admin';
 import { AuthModal } from './components/AuthModal';
 import { AuthorProfile } from './components/AuthorProfile';
 import { AuthorsList } from './components/AuthorsList';
@@ -1996,6 +1997,7 @@ export default function App() {
   const [editingPoll, setEditingPoll] = useState<Poll | null>(null);
   const [adminLiveBlogs, setAdminLiveBlogs] = useState<LiveBlog[]>([]);
   const [editingLiveBlog, setEditingLiveBlog] = useState<LiveBlog | null>(null);
+  const [editingClassified, setEditingClassified] = useState<Classified | null>(null);
   const [adminWebTV, setAdminWebTV] = useState<WebTV[]>([]);
   const [editingWebTV, setEditingWebTV] = useState<WebTV | null>(null);
   const [isCloudLoaded, setIsCloudLoaded] = useState(false);
@@ -2163,6 +2165,19 @@ export default function App() {
       return () => unsubscribe();
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment_success') === 'true') {
+      setActiveNotification({ 
+        message: "Paiement réussi ! Un administrateur va valider votre transaction sous peu.", 
+        type: 'success' 
+      });
+      setTimeout(() => setActiveNotification(null), 5000);
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   const handleMarkNotificationAsRead = async (id: string) => {
     await SupabaseService.markNotificationAsRead(id);
@@ -2627,6 +2642,39 @@ export default function App() {
     }
   };
 
+  const handleSaveClassified = async (classified: Classified) => {
+    try {
+      await SupabaseService.saveClassified(classified);
+      setClassifieds(prev => {
+        const index = prev.findIndex(c => c.id === classified.id);
+        if (index >= 0) {
+          const newList = [...prev];
+          newList[index] = classified;
+          return newList;
+        }
+        return [classified, ...prev];
+      });
+      setEditingClassified(null);
+      setActiveNotification({ message: "Annonce enregistrée !", type: 'success' });
+    } catch (error: any) {
+      console.error(error);
+      setActiveNotification({ message: `Erreur : ${error.message || "Impossible d'enregistrer l'annonce"}`, type: 'urgent' });
+    }
+  };
+
+  const handleDeleteClassified = async (id: string) => {
+    if (confirm("Voulez-vous vraiment supprimer cette annonce ?")) {
+      try {
+        await SupabaseService.deleteClassified(id);
+        setClassifieds(prev => prev.filter(c => c.id !== id));
+        setActiveNotification("Annonce supprimée.");
+      } catch (error) {
+        console.error(error);
+        setActiveNotification("Erreur lors de la suppression.");
+      }
+    }
+  };
+
   const handleSaveLiveBlog = async (blog: LiveBlog) => {
     try {
       await SupabaseService.saveLiveBlog(blog);
@@ -2693,6 +2741,20 @@ export default function App() {
     }
   };
 
+  const handleValidateTransaction = async (tid: string, uid: string) => {
+    try {
+      await SupabaseService.validatePremiumTransaction(tid, uid, siteSettings.premiumDurationMonths || 1);
+      setActiveNotification({ 
+        message: "Transaction validée ! L'utilisateur a maintenant accès au contenu Premium.", 
+        type: 'success' 
+      });
+      // Refresh stats if needed
+    } catch (error) {
+      console.error("Validation error:", error);
+      setActiveNotification({ message: "Erreur lors de la validation.", type: 'urgent' });
+    }
+  };
+
   const handleAdminLogout = async () => {
     try {
       await auth.signOut();
@@ -2707,47 +2769,51 @@ export default function App() {
   const handleConfirmPayment = async (amount: number, method: string, type: 'subscription' | 'donation') => {
     if (!currentUser) return;
 
-    const date = new Date().toLocaleString('fr-FR');
-    const adminUrl = `${window.location.origin}/admin?tab=premium`;
-
     try {
-      // 1. Supabase Notification for Admin
-      await SupabaseService.sendNotification({
-        id: crypto.randomUUID(),
-        userId: 'global',
-        title: "💰 Nouveau paiement en attente",
-        message: `${currentUser.email} a déclaré avoir payé ${amount} FCFA via ${method}`,
-        type: 'urgent',
-        link: "/admin?tab=premium",
-        date: new Date().toISOString(),
-        read: false
-      });
-
-      // 2. Email Notification to Admin
-      await SupabaseService.notifyAdminPayment({
-        email: currentUser.email,
-        amount,
-        method,
-        type: type === 'subscription' ? 'Abonnement Premium' : 'Donation',
-        date,
-        adminUrl
-      });
-
-      // 3. Record Transaction as PENDING
+      // 1. Record Transaction as PENDING
       await SupabaseService.recordTransaction(
         currentUser.uid,
-        currentUser.email,
+        currentUser.email || 'Anonyme',
         amount,
         method,
         type,
         'pending'
       );
 
+      // 2. Supabase Notification for Admin
+      await SupabaseService.sendNotification({
+        id: crypto.randomUUID(),
+        userId: 'admin',
+        title: "💰 Nouveau paiement en attente",
+        message: `${currentUser.email} a déclaré avoir payé ${amount} F via ${method}. Type: ${type === 'subscription' ? 'Abonnement' : 'Don'}.`,
+        type: 'urgent',
+        link: "/admin?tab=premium",
+        date: new Date().toISOString(),
+        read: false
+      } as any);
+
+      // 3. Email Notification to Admin
+      await SupabaseService.notifyAdminPayment({
+        email: currentUser.email || 'Anonyme',
+        amount,
+        method,
+        type: type === 'subscription' ? 'Abonnement' : 'Don',
+        date: new Date().toLocaleString('fr-FR'),
+        adminUrl: `${window.location.origin}/admin?tab=premium`
+      });
+
       // 4. Success Message to User
       setActiveNotification({ 
-        message: "Merci ! Votre paiement est en cours de vérification. Vous recevrez un email dès que votre compte sera activé (délai maximum 2h).", 
+        message: "Merci ! Votre paiement est en cours de vérification. Il sera validé manuellement par un administrateur sous peu.", 
         type: 'success' 
       });
+      setTimeout(() => setActiveNotification(null), 5000);
+
+      if (type === 'subscription') {
+        setShowPremiumModal(false);
+      } else {
+        setDonationSuccess(true);
+      }
     } catch (error) {
       console.error("[App] Confirmation payment error:", error);
       setActiveNotification({ message: "Erreur lors de la confirmation. Veuillez réessayer.", type: 'urgent' });
@@ -5240,10 +5306,17 @@ Dernière mise à jour : Avril 2026
                   onSave={handleSavePoll}
                   onCancel={() => setEditingPoll(null)}
                 />
+              ) : editingClassified ? (
+                <ClassifiedEditor 
+                  classified={editingClassified}
+                  onSave={handleSaveClassified}
+                  onCancel={() => setEditingClassified(null)}
+                />
               ) : (
                 <AdminDashboard 
                   articles={adminArticles}
                   events={adminEvents}
+                  classifieds={classifieds}
                   comments={allComments}
                   subscribers={subscribers}
                   mediaLibrary={mediaLibrary}
@@ -5257,22 +5330,26 @@ Dernière mise à jour : Avril 2026
                   onEditPoll={(p) => setEditingPoll(p)}
                   onEditLiveBlog={(l) => setEditingLiveBlog(l)}
                   onEditWebTV={(v) => setEditingWebTV(v)}
+                  onEditClassified={(c) => setEditingClassified(c)}
                   onCreateArticle={() => setEditingArticle({ id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0] } as any)}
                   onCreateEvent={() => setEditingEvent({ id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0] } as any)}
                   onCreatePoll={() => setEditingPoll({ id: crypto.randomUUID(), startDate: new Date().toISOString().split('T')[0], options: [{id: '1', text: '', votes: 0}, {id: '2', text: '', votes: 0}], active: true } as any)}
                   onCreateLiveBlog={() => setEditingLiveBlog({ id: crypto.randomUUID(), title: '', updates: [], status: 'live', createdAt: new Date().toISOString() } as any)}
                   onCreateWebTV={() => setEditingWebTV({ id: crypto.randomUUID(), title: '', description: '', videoUrl: '', thumbnail: '', category: 'Web TV', date: new Date().toISOString(), views: 0 } as any)}
+                  onCreateClassified={() => setEditingClassified({ id: crypto.randomUUID(), title: '', description: '', category: 'divers', location: '', contact: '', date: new Date().toISOString(), status: 'active', userId: currentUser?.uid || 'admin', username: currentUser?.displayName || 'Admin' } as any)}
                   onDeleteArticle={handleDeleteArticle}
                   onDeleteEvent={handleDeleteEvent}
                   onDeletePoll={handleDeletePoll}
                   onDeleteLiveBlog={handleDeleteLiveBlog}
                   onDeleteWebTV={handleDeleteWebTV}
+                  onDeleteClassified={handleDeleteClassified}
                   onDeleteComment={handleDeleteComment}
                   onDeleteSubscriber={handleDeleteSubscriber}
                   onDeleteMedia={handleDeleteMediaAsset}
                   onBlockUser={handleBlockUser}
                   onSaveSettings={handleSaveSettings}
                   onLogout={handleAdminLogout}
+                  onValidateTransaction={handleValidateTransaction}
                   onGenerateCode={() => setShowExportModal(true)}
                   setActiveNotification={setActiveNotification}
                   stats={adminStats}
@@ -5466,6 +5543,17 @@ Dernière mise à jour : Avril 2026
         onSuccess={handleAuthSuccess}
         setActiveNotification={setActiveNotification}
       />
+      {showPremiumModal && siteSettings.isPremiumActive && (
+        <AnimatePresence>
+          <PremiumModal 
+            onClose={() => setShowPremiumModal(false)} 
+            onUpgrade={handleUpgradePremium}
+            price={siteSettings.premiumPrice}
+            activeMethods={siteSettings.activePaymentMethods}
+            settings={siteSettings}
+          />
+        </AnimatePresence>
+      )}
     </div>
     </>
   );
@@ -5489,17 +5577,18 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
 
   const getPaymentDetails = (method: string) => {
     switch(method) {
-      case 'paypal': return settings.paypalId ? `ID: ${settings.paypalId}` : null;
-      case 'stripe': return settings.stripePublicKey ? "Paiement par Carte" : null;
+      case 'paypal': return settings.paymentLinks?.paypal || (settings.paypalId ? `ID: ${settings.paypalId}` : null);
+      case 'stripe': return settings.paymentLinks?.stripe || (settings.stripePublicKey ? "Paiement par Carte" : null);
       case 'orangeMoney': return settings.orangeMoneyNumber ? `Transfert au ${settings.orangeMoneyNumber}` : null;
       case 'wave': return settings.waveNumber ? `Transfert au ${settings.waveNumber}` : null;
       case 'mtn': return settings.mtnMoneyNumber ? `Transfert au ${settings.mtnMoneyNumber}` : null;
       case 'moov': return settings.moovMoneyNumber ? `Transfert au ${settings.moovMoneyNumber}` : null;
-      default: return null;
+      default: return settings.paymentLinks?.[method as keyof typeof settings.paymentLinks] || null;
     }
   };
 
-  const hasDirectLink = !!settings.paymentLinks?.[selectedMethod];
+  const paymentValue = getPaymentDetails(selectedMethod);
+  const isUrl = paymentValue?.startsWith('http');
 
   return (
     <motion.div
@@ -5528,6 +5617,22 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                  </div>
                  <h2 className="text-4xl font-black italic tracking-tighter leading-none uppercase">Akwaba<br/>Premium</h2>
                  <p className="text-slate-400 text-sm font-medium">L'information exclusive à portée de main.</p>
+                 
+                 <div className="pt-6 space-y-3">
+                    {[
+                      "Articles & Investigations exclusifs",
+                      "Web TV & Live Streaming illimité",
+                      "Événements & Agenda VIP",
+                      "Accès prioritaire aux petites annonces",
+                      "Expérience sans publicité"
+                    ].map((benefit, i) => (
+                      <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-slate-300">
+                        <CheckCircle size={12} className="text-primary" />
+                        {benefit}
+                      </div>
+                    ))}
+                 </div>
+
                  <div className="pt-8 border-t border-white/10 mt-8">
                     <span className="text-3xl font-black">{price} XOF</span>
                     <span className="text-xs text-slate-500 font-bold ml-2">/ MOIS</span>
@@ -5557,8 +5662,8 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                             )}
                             {name === 'paypal' || name === 'stripe' || name === 'flutterwave' ? <CreditCard size={20} className={selectedMethod === name ? "text-primary" : "text-slate-400"} /> : <Smartphone size={20} className={selectedMethod === name ? "text-primary" : "text-slate-400"} />}
                             <span className={cn(
-                              "text-[10px] font-black uppercase tracking-widest leading-none",
-                              selectedMethod === name ? "text-slate-900" : "text-slate-500"
+                              "text-[10px] font-black uppercase tracking-widest leading-none text-slate-500",
+                              selectedMethod === name && "text-slate-900"
                             )}>{name}</span>
                           </button>
                         ))}
@@ -5567,10 +5672,9 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
 
                   {selectedMethod && (
                     <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-2 animate-in fade-in slide-in-from-top-4">
-                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Détails du paiement</p>
-                       <p className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                          <CheckCircle size={16} className="text-emerald-500" />
-                          {getPaymentDetails(selectedMethod) || "Paiement via portail sécurisé"}
+                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Paiement via {selectedMethod}</p>
+                       <p className="text-xs font-bold text-slate-900 line-clamp-2">
+                          {isUrl ? "Un lien de paiement externe sera utilisé pour cette transaction." : paymentValue || "Paiement via transfert manuel sécurisé."}
                        </p>
                     </div>
                   )}
@@ -5582,7 +5686,7 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                       }}
                       className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-sm uppercase tracking-widest shadow-2xl hover:bg-primary transition-all flex items-center justify-center gap-3 group"
                     >
-                      VOIR LES INSTRUCTIONS DE PAIEMENT
+                      VOIR LES INSTRUCTIONS
                       <ArrowRight size={20} className="group-hover:translate-x-2 transition-transform" />
                     </button>
                     <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400 font-bold italic">
@@ -5594,25 +5698,44 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                 <div className="space-y-8 py-4 animate-in fade-in zoom-in">
                   <div className="space-y-4">
                     <div className="p-4 bg-primary/10 rounded-2xl w-fit text-primary">
-                       <Smartphone size={32} />
+                       {isUrl ? <Globe size={32} /> : <Smartphone size={32} />}
                     </div>
-                    <h3 className="text-2xl font-black">Finaliser votre Transfert</h3>
+                    <h3 className="text-2xl font-black">{isUrl ? "Paiement en ligne" : "Finaliser votre Transfert"}</h3>
                     <p className="text-sm text-slate-500 font-medium leading-relaxed">
-                      Veuillez effectuer le transfert de <span className="text-slate-900 font-black">{price} XOF</span> vers le numéro suivant :
+                      {isUrl 
+                        ? `Cliquez sur le bouton ci-dessous pour payer ${price} XOF via le portail sécurisé ${selectedMethod}.`
+                        : `Veuillez effectuer le transfert de ${price} XOF vers le numéro suivant :`
+                      }
                     </p>
                   </div>
 
                   <div className="p-8 bg-slate-900 rounded-[30px] text-white space-y-2 text-center relative overflow-hidden">
                      <div className="absolute inset-0 african-pattern opacity-10" />
-                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Numéro de réception</p>
-                     <p className="text-3xl font-black tracking-widest relative z-10">{getPaymentDetails(selectedMethod)?.split(' ').pop() || "NON CONFIGURÉ"}</p>
+                     {isUrl ? (
+                        <a 
+                          href={paymentValue || '#'} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-3 bg-primary text-white font-black px-8 py-4 rounded-2xl relative z-10 hover:scale-105 transition-all shadow-xl shadow-primary/20"
+                        >
+                          Lancer le paiement {selectedMethod} <ExternalLink size={20} />
+                        </a>
+                     ) : (
+                        <>
+                          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Numéro de réception</p>
+                          <p className="text-3xl font-black tracking-widest relative z-10">{paymentValue?.split(' ').pop() || "NON CONFIGURÉ"}</p>
+                        </>
+                     )}
                   </div>
 
                   <div className="space-y-4">
                     <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-3 items-start">
                        <Info size={18} className="text-amber-500 shrink-0" />
                        <p className="text-[10px] text-amber-800 font-bold leading-tight">
-                         Une fois le transfert effectué, veuillez nous envoyer une capture d'écran ou la référence de transaction via le support client. Votre compte sera activé dans les plus brefs délais.
+                         {isUrl 
+                          ? "Une fois le paiement effectué sur le site partenaire, revenez ici et cliquez sur 'J'AI PAYÉ' pour que nous puissions valider votre abonnement."
+                          : "Une fois le transfert effectué, veuillez cliquer sur 'J'AI PAYÉ'. Un administrateur vérifiera la transaction et activera votre compte."
+                         }
                        </p>
                     </div>
 
@@ -5629,7 +5752,7 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                         }}
                         className="py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all text-center flex items-center justify-center"
                        >
-                         ✅ J'AI PAYÉ, ACTIVER MON COMPTE
+                         ✅ J'AI PAYÉ
                        </button>
                     </div>
                   </div>
@@ -5646,4 +5769,4 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
       </motion.div>
     </motion.div>
   );
-}
+};

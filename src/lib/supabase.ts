@@ -814,6 +814,19 @@ export const SupabaseService = {
     if (error) console.error("Error updating transaction status:", error);
   },
 
+  async validatePremiumTransaction(transactionId: string, userId: string, months: number = 1): Promise<void> {
+    if (isPlaceholder) return;
+    try {
+      // 1. Update transaction status
+      await this.updateTransactionStatus(transactionId, 'success');
+      // 2. Upgrade user to premium
+      await this.upgradeToPremium(userId, 'Validated by Admin', months);
+    } catch (error) {
+      console.error("Error validating premium transaction:", error);
+      throw error;
+    }
+  },
+
   async importMockData(articles: Article[], events: Event[]): Promise<void> {
     if (isPlaceholder) return;
     
