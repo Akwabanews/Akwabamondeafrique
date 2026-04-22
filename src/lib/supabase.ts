@@ -778,7 +778,7 @@ export const SupabaseService = {
     return data as UserProfile[];
   },
 
-  async recordTransaction(userId: string, email: string, amount: number, method: string, type: 'subscription' | 'donation', status: 'pending' | 'success' | 'failed' = 'success'): Promise<void> {
+  async recordTransaction(userId: string, email: string, amount: number, method: string, type: 'subscription' | 'donation', status: 'pending' | 'success' | 'failed' = 'success', transactionReference?: string): Promise<void> {
     if (isPlaceholder) return;
     const { error } = await supabase.from('transactions').insert({
       userId,
@@ -787,6 +787,7 @@ export const SupabaseService = {
       method,
       type,
       status,
+      transaction_reference: transactionReference,
       date: new Date().toISOString()
     });
     if (error) console.error("Error recording transaction:", error);

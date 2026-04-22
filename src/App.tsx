@@ -2012,7 +2012,8 @@ export default function App() {
   });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState<string>('5000');
-  const [selectedPayment, setSelectedPayment] = useState<string>('orangeMoney');
+  const [selectedPayment, setSelectedPayment] = useState<string>('');
+  const [transactionId, setTransactionId] = useState<string>('');
   const [donationSuccess, setDonationSuccess] = useState(false);
   const [showCookieBanner, setShowCookieBanner] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -2084,6 +2085,41 @@ export default function App() {
   });
   const [allComments, setAllComments] = useState<Comment[]>([]);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+
+  useEffect(() => {
+    // Pick first active payment method as default for donation view
+    if (siteSettings.activePaymentMethods) {
+      const firstActive = Object.entries(siteSettings.activePaymentMethods).find(([_, active]) => active)?.[0];
+      if (firstActive && !selectedPayment) setSelectedPayment(firstActive);
+    }
+  }, [siteSettings.activePaymentMethods, selectedPayment]);
+
+  const getPaymentIcon = (method: string, isSelected: boolean) => {
+    const className = isSelected ? "text-primary" : "text-slate-400";
+    switch(method) {
+      case 'paypal': return <Globe size={24} className={className} />;
+      case 'stripe': return <CreditCard size={24} className={className} />;
+      case 'flutterwave': return <CreditCard size={24} className={className} />;
+      case 'orangeMoney': return <Smartphone size={24} className={className} />;
+      case 'wave': return <Smartphone size={24} className={className} />;
+      case 'mtn': return <Smartphone size={24} className={className} />;
+      case 'moov': return <Smartphone size={24} className={className} />;
+      default: return <CreditCard size={24} className={className} />;
+    }
+  };
+
+  const getPaymentLabel = (method: string) => {
+    switch(method) {
+      case 'paypal': return 'PayPal';
+      case 'stripe': return 'Stripe';
+      case 'flutterwave': return 'Flutterwave';
+      case 'orangeMoney': return 'Orange Money';
+      case 'wave': return 'Wave';
+      case 'mtn': return 'MTN Money';
+      case 'moov': return 'Moov Money';
+      default: return method;
+    }
+  };
   const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
   const [classifieds, setClassifieds] = useState<Classified[]>([]);
   const [liveBlogs, setLiveBlogs] = useState<LiveBlog[]>([]);
@@ -2771,7 +2807,7 @@ export default function App() {
     }
   };
 
-  const handleConfirmPayment = async (amount: number, method: string, type: 'subscription' | 'donation') => {
+  const handleConfirmPayment = async (amount: number, method: string, type: 'subscription' | 'donation', transId?: string) => {
     if (!currentUser) return;
 
     try {
@@ -2782,7 +2818,8 @@ export default function App() {
         amount,
         method,
         type,
-        'pending'
+        'pending',
+        transId
       );
 
       // 2. Supabase Notification for Admin
@@ -2790,7 +2827,7 @@ export default function App() {
         id: crypto.randomUUID(),
         userId: 'admin',
         title: "💰 Nouveau paiement en attente",
-        message: `${currentUser.email} a déclaré avoir payé ${amount} F via ${method}. Type: ${type === 'subscription' ? 'Abonnement' : 'Don'}.`,
+        message: `${currentUser.email} a déclaré avoir payé ${amount} F via ${method}. ID: ${transId || 'N/A'}. Type: ${type === 'subscription' ? 'Abonnement' : 'Don'}.`,
         type: 'urgent',
         link: "/admin?tab=premium",
         date: new Date().toISOString(),
@@ -2804,7 +2841,8 @@ export default function App() {
         method,
         type: type === 'subscription' ? 'Abonnement' : 'Don',
         date: new Date().toLocaleString('fr-FR'),
-        adminUrl: `${window.location.origin}/admin?tab=premium`
+        adminUrl: `${window.location.origin}/admin?tab=premium`,
+        transactionId: transId
       });
 
       // 4. Success Message to User
@@ -2825,13 +2863,13 @@ export default function App() {
     }
   };
 
-  const handleUpgradePremium = async (method: string) => {
+  const handleUpgradePremium = async (method: string, transId?: string) => {
     if (!currentUser) {
       handleUserLogin();
       return;
     }
     
-    await handleConfirmPayment(siteSettings.premiumPrice, method, 'subscription');
+    await handleConfirmPayment(siteSettings.premiumPrice, method, 'subscription', transId);
     setShowPremiumModal(false);
   };
 
@@ -4875,25 +4913,30 @@ export default function App() {
                       <h4 className="font-bold text-sm font-display uppercase tracking-widest text-[10px] text-slate-400">Mode de paiement sécurisé</h4>
                       {!paymentInitiated ? (
                         <>
-                          <div className="flex flex-wrap gap-4">
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                             {Object.entries(siteSettings.activePaymentMethods || {}).filter(([_, active]) => active).map(([method]) => (
                               <button 
                                 key={method}
                                 onClick={() => setSelectedPayment(method)}
                                 className={cn(
-                                  "flex flex-col items-center gap-2 p-4 border-2 rounded-2xl transition-all min-w-[120px]",
+                                  "flex flex-col items-start justify-between p-4 border-2 rounded-2xl transition-all h-24 relative overflow-hidden",
                                   selectedPayment === method
                                     ? "border-primary bg-primary/5 text-primary"
                                     : "border-slate-100 hover:bg-slate-50"
                                 )}
                               >
-                                {method === 'paypal' || method === 'stripe' ? <CreditCard /> : <Smartphone />}
-                                <span className="text-[10px] font-black uppercase tracking-wider">{method}</span>
+                                {selectedPayment === method && <div className="absolute top-2 right-2 text-primary animate-in zoom-in"><CheckCircle size={16} fill="white" /></div>}
+                                {getPaymentIcon(method, selectedPayment === method)}
+                                <span className="text-[10px] font-black uppercase tracking-wider">{getPaymentLabel(method)}</span>
                               </button>
                             ))}
                           </div>
                           <button 
                             onClick={() => {
+                              if (!selectedPayment) {
+                                alert("Veuillez choisir un moyen de paiement.");
+                                return;
+                              }
                               if (!selectedAmount || parseInt(selectedAmount) <= 0) {
                                 alert("Veuillez choisir un montant.");
                                 return;
@@ -4910,8 +4953,8 @@ export default function App() {
                         <div className="space-y-6 animate-in fade-in zoom-in">
                           <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
                              <div className="flex items-center gap-3 text-primary">
-                                {selectedPayment === 'paypal' || selectedPayment === 'stripe' ? <Globe size={24} /> : <Smartphone size={24} />}
-                                <p className="text-sm font-black uppercase">{selectedPayment}</p>
+                                {getPaymentIcon(selectedPayment, true)}
+                                <p className="text-sm font-black uppercase">{getPaymentLabel(selectedPayment)}</p>
                              </div>
                              
                              <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-inner">
@@ -4919,6 +4962,8 @@ export default function App() {
                                   const details = (() => {
                                     switch(selectedPayment) {
                                       case 'paypal': return siteSettings.paymentLinks?.paypal;
+                                      case 'stripe': return siteSettings.paymentLinks?.stripe;
+                                      case 'flutterwave': return siteSettings.paymentLinks?.flutterwave;
                                       case 'orangeMoney': return siteSettings.orangeMoneyNumber ? `Transfert au ${siteSettings.orangeMoneyNumber}` : null;
                                       case 'wave': return siteSettings.waveNumber ? `Transfert au ${siteSettings.waveNumber}` : null;
                                       case 'mtn': return siteSettings.mtnMoneyNumber ? `Transfert au ${siteSettings.mtnMoneyNumber}` : null;
@@ -4934,16 +4979,28 @@ export default function App() {
                                       <div className="text-center space-y-4">
                                         <p className="text-xs text-slate-500">Un lien de paiement externe sera utilisé :</p>
                                         <a href={details} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold text-sm">
-                                          Payer avec {selectedPayment} <ExternalLink size={16} />
+                                          Ouvrir le portail {getPaymentLabel(selectedPayment)} <ExternalLink size={16} />
                                         </a>
                                       </div>
                                     );
                                   }
                                   
                                   return (
-                                    <div className="text-center space-y-2">
-                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Numéro de réception</p>
-                                      <p className="text-2xl font-black tracking-widest text-slate-900">{details?.toString().split(' ').pop() || "NON CONFIGURÉ"}</p>
+                                    <div className="text-center space-y-4">
+                                      <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Numéro de réception</p>
+                                        <p className="text-2xl font-black tracking-widest text-slate-900">{details?.toString().split(' ').pop() || "NON CONFIGURÉ"}</p>
+                                      </div>
+                                      <div className="pt-4 border-t border-slate-100">
+                                         <p className="text-[10px] font-black uppercase text-slate-400 mb-2">ID de Transaction / Référence SMS</p>
+                                         <input 
+                                           type="text"
+                                           placeholder="Ex: T240122.1234.C..."
+                                           value={transactionId}
+                                           onChange={(e) => setTransactionId(e.target.value)}
+                                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                                         />
+                                      </div>
                                     </div>
                                   );
                                 })()}
@@ -4959,15 +5016,20 @@ export default function App() {
                             </button>
                             <button 
                               onClick={() => {
+                                if (!transactionId || transactionId.length < 5) {
+                                  alert("Veuillez entrer la référence ou l'ID de transaction reçu par SMS/Email pour vérification.");
+                                  return;
+                                }
                                 const amountVal = parseInt(selectedAmount) || 0;
-                                handleConfirmPayment(amountVal, selectedPayment, 'donation').then(() => {
+                                handleConfirmPayment(amountVal, selectedPayment, 'donation', transactionId).then(() => {
                                    setDonationSuccess(true);
                                    setPaymentInitiated(false);
+                                   setTransactionId('');
                                 });
                               }}
                               className="py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                             >
-                              ✅ J'AI PAYÉ
+                              ✅ CONFIRMER MON PAIEMENT
                             </button>
                           </div>
                         </div>
@@ -5619,6 +5681,8 @@ Dernière mise à jour : Avril 2026
             price={siteSettings.premiumPrice}
             activeMethods={siteSettings.activePaymentMethods}
             settings={siteSettings}
+            getPaymentIcon={getPaymentIcon}
+            getPaymentLabel={getPaymentLabel}
           />
         )}
       </AnimatePresence>
@@ -5627,15 +5691,18 @@ Dernière mise à jour : Avril 2026
   );
 }
 
-const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: { 
+const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings, getPaymentIcon, getPaymentLabel }: { 
   onClose: () => void, 
-  onUpgrade: (method: string) => void,
+  onUpgrade: (method: string, tid: string) => void,
   price: number,
   activeMethods: Record<string, boolean>,
-  settings: SiteSettings
+  settings: SiteSettings,
+  getPaymentIcon: (m: string, s: boolean) => React.ReactNode,
+  getPaymentLabel: (m: string) => string
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<string>('');
   const [paymentInitiated, setPaymentInitiated] = useState(false);
+  const [transactionId, setTransactionId] = useState<string>('');
 
   useEffect(() => {
     // Select first active method by default
@@ -5647,6 +5714,7 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
     switch(method) {
       case 'paypal': return settings.paymentLinks?.paypal || (settings.paypalId ? `ID: ${settings.paypalId}` : null);
       case 'stripe': return settings.paymentLinks?.stripe || (settings.stripePublicKey ? "Paiement par Carte" : null);
+      case 'flutterwave': return settings.paymentLinks?.flutterwave || "Paiement via Flutterwave";
       case 'orangeMoney': return settings.orangeMoneyNumber ? `Transfert au ${settings.orangeMoneyNumber}` : null;
       case 'wave': return settings.waveNumber ? `Transfert au ${settings.waveNumber}` : null;
       case 'mtn': return settings.mtnMoneyNumber ? `Transfert au ${settings.mtnMoneyNumber}` : null;
@@ -5728,11 +5796,11 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                                  <CheckCircle size={16} fill="white" />
                               </div>
                             )}
-                            {name === 'paypal' || name === 'stripe' || name === 'flutterwave' ? <CreditCard size={20} className={selectedMethod === name ? "text-primary" : "text-slate-400"} /> : <Smartphone size={20} className={selectedMethod === name ? "text-primary" : "text-slate-400"} />}
+                            {getPaymentIcon(name, selectedMethod === name)}
                             <span className={cn(
                               "text-[10px] font-black uppercase tracking-widest leading-none text-slate-500",
                               selectedMethod === name && "text-slate-900"
-                            )}>{name}</span>
+                            )}>{getPaymentLabel(name)}</span>
                           </button>
                         ))}
                      </div>
@@ -5777,7 +5845,7 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                     </p>
                   </div>
 
-                  <div className="p-8 bg-slate-900 rounded-[30px] text-white space-y-2 text-center relative overflow-hidden">
+                  <div className="p-8 bg-slate-900 rounded-[30px] text-white space-y-4 text-center relative overflow-hidden">
                      <div className="absolute inset-0 african-pattern opacity-10" />
                      {isUrl ? (
                         <a 
@@ -5794,6 +5862,17 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                           <p className="text-3xl font-black tracking-widest relative z-10">{paymentValue?.split(' ').pop() || "NON CONFIGURÉ"}</p>
                         </>
                      )}
+
+                     <div className="pt-4 border-t border-white/10 relative z-10">
+                        <p className="text-[10px] font-black uppercase text-slate-400 mb-2">ID de Transaction / Référence</p>
+                        <input 
+                          type="text"
+                          placeholder="Ex: T240122.1234.C..."
+                          value={transactionId}
+                          onChange={(e) => setTransactionId(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/50 text-white placeholder:text-slate-600"
+                        />
+                     </div>
                   </div>
 
                   <div className="space-y-4">
@@ -5816,11 +5895,15 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings }: {
                        </button>
                        <button 
                         onClick={() => {
-                          onUpgrade(selectedMethod);
+                          if (!transactionId || transactionId.length < 5) {
+                            alert("Veuillez entrer l'ID de transaction pour vérification.");
+                            return;
+                          }
+                          onUpgrade(selectedMethod, transactionId);
                         }}
-                        className="py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all text-center flex items-center justify-center"
+                        className="py-4 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 transition-all text-center flex items-center justify-center font-display"
                        >
-                         ✅ J'AI PAYÉ
+                         ✅ CONFIRMER PAIEMENT
                        </button>
                     </div>
                   </div>
