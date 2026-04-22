@@ -2019,6 +2019,7 @@ export default function App() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [adminClickCount, setAdminClickCount] = useState(0);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [paymentInitiated, setPaymentInitiated] = useState(false);
   const [showClassifiedsModal, setShowClassifiedsModal] = useState(false);
   const [adminStats, setAdminStats] = useState<any>(null);
   const [adminActiveTab, setAdminActiveTab] = useState<string>('articles');
@@ -2075,6 +2076,10 @@ export default function App() {
       moov: "",
       wave: ""
     },
+    orangeMoneyNumber: "0707070707",
+    mtnMoneyNumber: "0505050505",
+    moovMoneyNumber: "0101010101",
+    waveNumber: "0708091011",
     premiumDurationMonths: 1
   });
   const [allComments, setAllComments] = useState<Comment[]>([]);
@@ -4868,37 +4873,106 @@ export default function App() {
                     
                     <div className="space-y-4">
                       <h4 className="font-bold text-sm font-display uppercase tracking-widest text-[10px] text-slate-400">Mode de paiement sécurisé</h4>
-                      <div className="flex flex-wrap gap-4">
-                        {Object.entries(siteSettings.activePaymentMethods || {}).filter(([_, active]) => active).map(([method]) => (
+                      {!paymentInitiated ? (
+                        <>
+                          <div className="flex flex-wrap gap-4">
+                            {Object.entries(siteSettings.activePaymentMethods || {}).filter(([_, active]) => active).map(([method]) => (
+                              <button 
+                                key={method}
+                                onClick={() => setSelectedPayment(method)}
+                                className={cn(
+                                  "flex flex-col items-center gap-2 p-4 border-2 rounded-2xl transition-all min-w-[120px]",
+                                  selectedPayment === method
+                                    ? "border-primary bg-primary/5 text-primary"
+                                    : "border-slate-100 hover:bg-slate-50"
+                                )}
+                              >
+                                {method === 'paypal' || method === 'stripe' ? <CreditCard /> : <Smartphone />}
+                                <span className="text-[10px] font-black uppercase tracking-wider">{method}</span>
+                              </button>
+                            ))}
+                          </div>
                           <button 
-                            key={method}
-                            onClick={() => setSelectedPayment(method)}
-                            className={cn(
-                              "flex flex-col items-center gap-2 p-4 border-2 rounded-2xl transition-all min-w-[120px]",
-                              selectedPayment === method
-                                ? "border-primary bg-primary/5 text-primary"
-                                : "border-slate-100 hover:bg-slate-50"
-                            )}
+                            onClick={() => {
+                              if (!selectedAmount || parseInt(selectedAmount) <= 0) {
+                                alert("Veuillez choisir un montant.");
+                                return;
+                              }
+                              setPaymentInitiated(true);
+                            }}
+                            className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-lg shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
                           >
-                            {method === 'paypal' || method === 'stripe' ? <CreditCard /> : <Smartphone />}
-                            <span className="text-[10px] font-black uppercase tracking-wider">{method}</span>
+                            CONTINUER
+                            <ArrowRight size={20} />
                           </button>
-                        ))}
-                      </div>
-                    </div>
+                        </>
+                      ) : (
+                        <div className="space-y-6 animate-in fade-in zoom-in">
+                          <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
+                             <div className="flex items-center gap-3 text-primary">
+                                {selectedPayment === 'paypal' || selectedPayment === 'stripe' ? <Globe size={24} /> : <Smartphone size={24} />}
+                                <p className="text-sm font-black uppercase">{selectedPayment}</p>
+                             </div>
+                             
+                             <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-inner">
+                                {(() => {
+                                  const details = (() => {
+                                    switch(selectedPayment) {
+                                      case 'paypal': return siteSettings.paymentLinks?.paypal;
+                                      case 'orangeMoney': return siteSettings.orangeMoneyNumber ? `Transfert au ${siteSettings.orangeMoneyNumber}` : null;
+                                      case 'wave': return siteSettings.waveNumber ? `Transfert au ${siteSettings.waveNumber}` : null;
+                                      case 'mtn': return siteSettings.mtnMoneyNumber ? `Transfert au ${siteSettings.mtnMoneyNumber}` : null;
+                                      case 'moov': return siteSettings.moovMoneyNumber ? `Transfert au ${siteSettings.moovMoneyNumber}` : null;
+                                      default: return siteSettings.paymentLinks?.[selectedPayment as keyof typeof siteSettings.paymentLinks] || "Instructions manuelles";
+                                    }
+                                  })();
+                                  
+                                  const isUrl = details?.toString().startsWith('http');
+                                  
+                                  if (isUrl) {
+                                    return (
+                                      <div className="text-center space-y-4">
+                                        <p className="text-xs text-slate-500">Un lien de paiement externe sera utilisé :</p>
+                                        <a href={details} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold text-sm">
+                                          Payer avec {selectedPayment} <ExternalLink size={16} />
+                                        </a>
+                                      </div>
+                                    );
+                                  }
+                                  
+                                  return (
+                                    <div className="text-center space-y-2">
+                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Numéro de réception</p>
+                                      <p className="text-2xl font-black tracking-widest text-slate-900">{details?.toString().split(' ').pop() || "NON CONFIGURÉ"}</p>
+                                    </div>
+                                  );
+                                })()}
+                             </div>
+                          </div>
 
-                    <button 
-                      onClick={() => {
-                        const amountVal = parseInt(selectedAmount) || 0;
-                        handleConfirmPayment(amountVal, selectedPayment, 'donation').then(() => {
-                           setDonationSuccess(true);
-                        });
-                      }}
-                      className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-lg shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
-                    >
-                      ✅ J'AI PAYÉ, CONFIRMER MON DON
-                      <Heart size={20} fill="currentColor" />
-                    </button>
+                          <div className="grid grid-cols-2 gap-4">
+                            <button 
+                              onClick={() => setPaymentInitiated(false)}
+                              className="py-5 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                            >
+                              Retour
+                            </button>
+                            <button 
+                              onClick={() => {
+                                const amountVal = parseInt(selectedAmount) || 0;
+                                handleConfirmPayment(amountVal, selectedPayment, 'donation').then(() => {
+                                   setDonationSuccess(true);
+                                   setPaymentInitiated(false);
+                                });
+                              }}
+                              className="py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                            >
+                              ✅ J'AI PAYÉ
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -5371,15 +5445,6 @@ Dernière mise à jour : Avril 2026
               onClose={() => setShowExportModal(false)} 
             />
           )}
-          {showPremiumModal && (
-            <PremiumModal 
-              onClose={() => setShowPremiumModal(false)}
-              onUpgrade={handleUpgradePremium}
-              price={siteSettings.premiumPrice}
-              activeMethods={siteSettings.activePaymentMethods}
-              settings={siteSettings}
-            />
-          )}
         </AnimatePresence>
       </main>
 
@@ -5543,17 +5608,20 @@ Dernière mise à jour : Avril 2026
         onSuccess={handleAuthSuccess}
         setActiveNotification={setActiveNotification}
       />
-      {showPremiumModal && siteSettings.isPremiumActive && (
-        <AnimatePresence>
+      <AnimatePresence>
+        {showPremiumModal && (
           <PremiumModal 
-            onClose={() => setShowPremiumModal(false)} 
+            onClose={() => {
+              setShowPremiumModal(false);
+              setPaymentInitiated(false);
+            }} 
             onUpgrade={handleUpgradePremium}
             price={siteSettings.premiumPrice}
             activeMethods={siteSettings.activePaymentMethods}
             settings={siteSettings}
           />
-        </AnimatePresence>
-      )}
+        )}
+      </AnimatePresence>
     </div>
     </>
   );
