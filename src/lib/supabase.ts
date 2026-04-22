@@ -736,7 +736,7 @@ export const SupabaseService = {
     return false;
   },
 
-  async notifyAdminPayment(data: { email: string; amount: number; method: string; type: string; date: string; adminUrl: string }): Promise<void> {
+  async notifyAdminPayment(data: { email: string; amount: number; method: string; type: string; date: string; adminUrl: string; transactionId?: string }): Promise<void> {
     if (isPlaceholder) return;
     try {
       const { error } = await supabase.functions.invoke('notify-admin-payment', {

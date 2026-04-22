@@ -450,7 +450,8 @@ const UserProfileView = ({
   onLogout,
   onFollowAuthor,
   onFollowCategory,
-  onAuthorClick
+  onAuthorClick,
+  onUpgrade
 }: { 
   user: FirebaseUser, 
   likedArticles: Article[], 
@@ -464,7 +465,8 @@ const UserProfileView = ({
   onLogout: () => void,
   onFollowAuthor: (name: string) => void,
   onFollowCategory: (cat: string) => void,
-  onAuthorClick?: (name: string) => void
+  onAuthorClick?: (name: string) => void,
+  onUpgrade: () => void
 }) => {
   const [activeTab, setActiveTab] = useState<'saved' | 'liked' | 'activity'>('saved');
 
@@ -483,8 +485,15 @@ const UserProfileView = ({
           className="w-32 h-32 rounded-full border-4 border-primary shadow-xl object-cover aspect-square"
         />
         <div className="text-center md:text-left space-y-2">
-          <h2 className="text-3xl font-black">{user.displayName || 'Utilisateur Akwaba'}</h2>
-          <p className="text-slate-500 font-bold">{user.email}</p>
+           <div className="flex items-center justify-center md:justify-start gap-3">
+              <h2 className="text-3xl font-black">{user.displayName || 'Utilisateur Akwaba'}</h2>
+              {user.isPremium && (
+                <div className="px-3 py-1 bg-amber-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                   <Lock size={10} fill="white" /> PREMIUM
+                </div>
+              )}
+           </div>
+           <p className="text-slate-500 font-bold">{user.email}</p>
           <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-4">
              <div className="flex flex-col items-center px-4 py-2 bg-slate-50 rounded-2xl border border-slate-100 min-w-[80px]">
                 <span className="font-black text-primary text-xl">{savedArticles.length}</span>
@@ -500,10 +509,18 @@ const UserProfileView = ({
              </div>
           </div>
         </div>
-        <div className="md:ml-auto flex flex-col gap-3">
+        <div className="md:ml-auto flex flex-col gap-3 w-full md:w-auto">
+          {!user.isPremium && (
+            <button 
+              onClick={onUpgrade}
+              className="flex items-center justify-center gap-2 px-8 py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all text-xs uppercase tracking-widest"
+            >
+              <Award size={18} /> Devenir Premium
+            </button>
+          )}
           <button 
             onClick={onLogout}
-            className="flex items-center gap-2 px-6 py-3 bg-red-50 text-red-500 rounded-2xl font-bold hover:bg-red-100 transition-colors"
+            className="flex items-center justify-center gap-2 px-8 py-4 bg-slate-100 text-slate-500 rounded-2xl font-bold hover:bg-slate-200 transition-colors text-xs uppercase tracking-widest"
           >
             <LogOut size={18} /> Déconnexion
           </button>
@@ -2061,11 +2078,11 @@ export default function App() {
     isPremiumActive: true,
     activePaymentMethods: {
       paypal: true,
-      stripe: false,
-      flutterwave: false,
+      stripe: true,
+      flutterwave: true,
       orangeMoney: true,
       mtn: true,
-      moov: false,
+      moov: true,
       wave: true
     },
     paymentLinks: {
@@ -4297,20 +4314,27 @@ export default function App() {
                         return (
                           <div className="space-y-6">
                             <ReactMarkdown>{paragraphs.slice(0, 2).join('\n\n')}</ReactMarkdown>
-                            <div className="relative py-20 px-8 rounded-[40px] bg-slate-900 text-white overflow-hidden text-center space-y-6 shadow-2xl">
-                               <div className="absolute inset-0 opacity-10 safari-blur">
+                              <div className="relative z-10 py-20 px-8 rounded-[40px] bg-slate-900 text-white overflow-hidden text-center space-y-6 shadow-2xl">
+                               <div className="absolute inset-0 opacity-10 safari-blur pointer-events-none">
                                   <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-primary/20 to-transparent" />
                                </div>
                                <Award size={48} className="mx-auto text-amber-500" />
                                <h4 className="text-2xl font-black italic tracking-tighter">CONTENU RÉSERVÉ AUX MEMBRES</h4>
                                <p className="text-slate-400 text-sm max-w-xs mx-auto">Devenez membre Premium pour lire la suite de cet article exclusif et nos analyses approfondies.</p>
                                <button 
-                                 onClick={() => setShowPremiumModal(true)}
-                                 className="px-10 py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
+                                 onClick={() => {
+                                   if (!currentUser) {
+                                     setShowLoginModal(true);
+                                     setActiveNotification({ message: "Veuillez vous connecter pour vous abonner.", type: 'info' });
+                                   } else {
+                                     setShowPremiumModal(true);
+                                   }
+                                 }}
+                                 className="px-10 py-4 bg-primary text-white rounded-2xl font-black shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
                                >
                                  S'ABONNER POUR LIRE LA SUITE
                                </button>
-                               <div className="pt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Akwaba Premium • {siteSettings.premiumPrice} XOF / mois</div>
+                               <div className="pt-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Akwaba Premium • {siteSettings?.premiumPrice || 5000} XOF / mois</div>
                             </div>
                           </div>
                         );
@@ -4833,6 +4857,7 @@ export default function App() {
               onFollowAuthor={handleFollowAuthor}
               onFollowCategory={handleFollowCategory}
               onAuthorClick={handleAuthorClick}
+              onUpgrade={() => setShowPremiumModal(true)}
             />
           ) : currentView === 'donate' ? (
             <motion.div 
@@ -4911,52 +4936,32 @@ export default function App() {
                     
                     <div className="space-y-4">
                       <h4 className="font-bold text-sm font-display uppercase tracking-widest text-[10px] text-slate-400">Mode de paiement sécurisé</h4>
-                      {!paymentInitiated ? (
-                        <>
-                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                            {Object.entries(siteSettings.activePaymentMethods || {}).filter(([_, active]) => active).map(([method]) => (
-                              <button 
-                                key={method}
-                                onClick={() => setSelectedPayment(method)}
-                                className={cn(
-                                  "flex flex-col items-start justify-between p-4 border-2 rounded-2xl transition-all h-24 relative overflow-hidden",
-                                  selectedPayment === method
-                                    ? "border-primary bg-primary/5 text-primary"
-                                    : "border-slate-100 hover:bg-slate-50"
-                                )}
-                              >
-                                {selectedPayment === method && <div className="absolute top-2 right-2 text-primary animate-in zoom-in"><CheckCircle size={16} fill="white" /></div>}
-                                {getPaymentIcon(method, selectedPayment === method)}
-                                <span className="text-[10px] font-black uppercase tracking-wider">{getPaymentLabel(method)}</span>
-                              </button>
-                            ))}
-                          </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                        {Object.entries(siteSettings.activePaymentMethods || {}).filter(([_, active]) => active).map(([method]) => (
                           <button 
-                            onClick={() => {
-                              if (!selectedPayment) {
-                                alert("Veuillez choisir un moyen de paiement.");
-                                return;
-                              }
-                              if (!selectedAmount || parseInt(selectedAmount) <= 0) {
-                                alert("Veuillez choisir un montant.");
-                                return;
-                              }
-                              setPaymentInitiated(true);
-                            }}
-                            className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-lg shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                            key={method}
+                            onClick={() => setSelectedPayment(method)}
+                            className={cn(
+                              "flex flex-col items-start justify-between p-4 border-2 rounded-2xl transition-all h-24 relative overflow-hidden",
+                              selectedPayment === method
+                                ? "border-primary bg-primary/5 text-primary"
+                                : "border-slate-100 hover:bg-slate-50"
+                            )}
                           >
-                            CONTINUER
-                            <ArrowRight size={20} />
+                            {selectedPayment === method && <div className="absolute top-2 right-2 text-primary animate-in zoom-in"><CheckCircle size={16} fill="white" /></div>}
+                            {getPaymentIcon(method, selectedPayment === method)}
+                            <span className="text-[10px] font-black uppercase tracking-wider">{getPaymentLabel(method)}</span>
                           </button>
-                        </>
-                      ) : (
-                        <div className="space-y-6 animate-in fade-in zoom-in">
+                        ))}
+                      </div>
+
+                      {selectedPayment && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          className="space-y-6 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-top-4"
+                        >
                           <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
-                             <div className="flex items-center gap-3 text-primary">
-                                {getPaymentIcon(selectedPayment, true)}
-                                <p className="text-sm font-black uppercase">{getPaymentLabel(selectedPayment)}</p>
-                             </div>
-                             
                              <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-inner">
                                 {(() => {
                                   const details = (() => {
@@ -5007,32 +5012,27 @@ export default function App() {
                              </div>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-4">
-                            <button 
-                              onClick={() => setPaymentInitiated(false)}
-                              className="py-5 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
-                            >
-                              Retour
-                            </button>
-                            <button 
-                              onClick={() => {
-                                if (!transactionId || transactionId.length < 5) {
-                                  alert("Veuillez entrer la référence ou l'ID de transaction reçu par SMS/Email pour vérification.");
-                                  return;
-                                }
-                                const amountVal = parseInt(selectedAmount) || 0;
-                                handleConfirmPayment(amountVal, selectedPayment, 'donation', transactionId).then(() => {
-                                   setDonationSuccess(true);
-                                   setPaymentInitiated(false);
-                                   setTransactionId('');
-                                });
-                              }}
-                              className="py-5 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
-                            >
-                              ✅ CONFIRMER MON PAIEMENT
-                            </button>
-                          </div>
-                        </div>
+                          <button 
+                            onClick={() => {
+                              if (!transactionId || transactionId.length < 5) {
+                                alert("Veuillez entrer la référence ou l'ID de transaction reçu par SMS/Email pour vérification.");
+                                return;
+                              }
+                              const amountVal = parseInt(selectedAmount) || 0;
+                              if (!amountVal || amountVal <= 0) {
+                                alert("Veuillez choisir un montant.");
+                                return;
+                              }
+                              handleConfirmPayment(amountVal, selectedPayment, 'donation', transactionId).then(() => {
+                                 setDonationSuccess(true);
+                                 setTransactionId('');
+                              });
+                            }}
+                            className="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-lg shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3"
+                          >
+                            ✅ CONFIRMER MON DON
+                          </button>
+                        </motion.div>
                       )}
                     </div>
                   </div>
@@ -5706,8 +5706,10 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings, getP
 
   useEffect(() => {
     // Select first active method by default
-    const firstActive = Object.entries(activeMethods).find(([_, active]) => active)?.[0];
-    if (firstActive) setSelectedMethod(firstActive);
+    if (activeMethods) {
+      const firstActive = Object.entries(activeMethods).find(([_, active]) => active)?.[0];
+      if (firstActive) setSelectedMethod(firstActive);
+    }
   }, [activeMethods]);
 
   const getPaymentDetails = (method: string) => {
