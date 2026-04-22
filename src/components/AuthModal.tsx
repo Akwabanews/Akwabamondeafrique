@@ -155,27 +155,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden relative"
+        className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden relative flex flex-col max-h-[90vh]"
       >
-        {/* Header Decor */}
-        <div className="h-32 bg-primary relative overflow-hidden">
+        {/* Header Decor - Fixed height on top */}
+        <div className="h-28 md:h-32 bg-primary relative overflow-hidden shrink-0">
           <div className="absolute inset-0 opacity-10 flex flex-wrap gap-4 p-4 pointer-events-none">
              {[...Array(20)].map((_, i) => <Globe key={i} size={48} className="translate-x-2 translate-y-2 rotate-12" />)}
           </div>
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="bg-white/10 p-4 rounded-full backdrop-blur-md">
-              <User size={48} className="text-white" />
+              <User size={40} className="text-white md:hidden" />
+              <User size={48} className="text-white hidden md:block" />
             </div>
           </div>
           <button 
+            type="button"
             onClick={onClose}
-            className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+            className="absolute top-4 right-4 md:top-6 md:right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-10"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="p-8">
+        <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar">
           {isVerificationPending ? (
             <div className="text-center space-y-6 py-4">
               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto animate-bounce-slow">

@@ -102,7 +102,7 @@ const safeFormatDate = (dateStr: any, formatStr: string = 'dd MMM yyyy') => {
   }
 };
 
-const Badge = ({ children, category }: { children: React.ReactNode; category?: string }) => {
+const Badge = ({ children, category, icon }: { children: React.ReactNode; category?: string; icon?: string }) => {
   const colors: Record<string, string> = {
     'Afrique': 'bg-orange-500 text-white',
     'Monde': 'bg-blue-500 text-white',
@@ -119,9 +119,10 @@ const Badge = ({ children, category }: { children: React.ReactNode; category?: s
 
   return (
     <span className={cn(
-      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+      "px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 w-fit",
       category ? colors[category] || 'bg-slate-200 text-slate-700' : 'bg-slate-200 text-slate-700'
     )}>
+      {icon && <span>{icon}</span>}
       {children}
     </span>
   );
@@ -132,13 +133,15 @@ const HeroSlideshow = ({
   onArticleClick, 
   onBookmark, 
   bookmarkedIds,
-  onAuthorClick
+  onAuthorClick,
+  categoryIcons
 }: { 
   articles: Article[]; 
   onArticleClick: (a: Article) => void;
   onBookmark: (id: string, e: React.MouseEvent) => void;
   bookmarkedIds: Set<string>;
   onAuthorClick?: (name: string) => void;
+  categoryIcons?: Record<string, string>;
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -184,7 +187,7 @@ const HeroSlideshow = ({
             </button>
           </div>
           <div className="absolute bottom-0 left-0 p-6 md:p-10 w-full md:w-3/4">
-            <Badge category={articles[currentIndex].category}>{articles[currentIndex].category}</Badge>
+            <Badge category={articles[currentIndex].category} icon={categoryIcons?.[articles[currentIndex].category]}>{articles[currentIndex].category}</Badge>
             <h2 className="text-white font-display font-black text-2xl md:text-4xl mt-4 leading-[1.1] tracking-tight">
               {articles[currentIndex].title}
             </h2>
@@ -224,13 +227,15 @@ const TrendingSection = ({
   onArticleClick, 
   onBookmark, 
   bookmarkedIds,
-  onAuthorClick
+  onAuthorClick,
+  categoryIcons
 }: { 
   articles: Article[]; 
   onArticleClick: (a: Article) => void;
   onBookmark: (id: string, e: React.MouseEvent) => void;
   bookmarkedIds: Set<string>;
   onAuthorClick?: (name: string) => void;
+  categoryIcons?: Record<string, string>;
 }) => {
   return (
     <section className="space-y-6">
@@ -252,7 +257,7 @@ const TrendingSection = ({
             </span>
             <div className="space-y-1 flex-1">
               <div className="flex justify-between items-start">
-                <Badge category={article.category}>{article.category}</Badge>
+                <Badge category={article.category} icon={categoryIcons?.[article.category]}>{article.category}</Badge>
                 <button 
                   onClick={(e) => { e.stopPropagation(); onBookmark(article.id, e); }}
                   className={cn(
@@ -287,13 +292,14 @@ const TrendingSection = ({
   );
 };
 
-const ArticleCard = ({ article, onClick, variant = 'horizontal', onBookmark, isBookmarked, onAuthorClick }: { 
+const ArticleCard = ({ article, onClick, variant = 'horizontal', onBookmark, isBookmarked, onAuthorClick, categoryIcon }: { 
   article: Article; 
   onClick: () => void; 
   variant?: 'horizontal' | 'vertical' | 'hero';
   onBookmark?: (id: string, e: React.MouseEvent) => void;
   isBookmarked?: boolean;
   onAuthorClick?: (name: string) => void;
+  categoryIcon?: string;
 }) => {
   if (variant === 'hero') {
     return (
@@ -327,7 +333,7 @@ const ArticleCard = ({ article, onClick, variant = 'horizontal', onBookmark, isB
           </button>
         </div>
         <div className="absolute bottom-0 left-0 p-4 w-full">
-          <Badge category={article.category}>{article.category}</Badge>
+          <Badge category={article.category} icon={categoryIcon}>{article.category}</Badge>
           <h2 className="text-white font-display font-bold text-xl mt-2 leading-tight line-clamp-2">
             {article.title}
           </h2>
@@ -388,7 +394,7 @@ const ArticleCard = ({ article, onClick, variant = 'horizontal', onBookmark, isB
       <div className="p-3 flex flex-col justify-between flex-1">
         <div>
           <div className="flex justify-between items-start mb-1">
-            <Badge category={article.category}>{article.category}</Badge>
+            <Badge category={article.category} icon={categoryIcon}>{article.category}</Badge>
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-slate-400">{article.readingTime}</span>
               {variant === 'horizontal' && (
@@ -451,7 +457,8 @@ const UserProfileView = ({
   onFollowAuthor,
   onFollowCategory,
   onAuthorClick,
-  onUpgrade
+  onUpgrade,
+  categoryIcons
 }: { 
   user: FirebaseUser, 
   likedArticles: Article[], 
@@ -466,7 +473,8 @@ const UserProfileView = ({
   onFollowAuthor: (name: string) => void,
   onFollowCategory: (cat: string) => void,
   onAuthorClick?: (name: string) => void,
-  onUpgrade: () => void
+  onUpgrade: () => void,
+  categoryIcons?: Record<string, string>
 }) => {
   const [activeTab, setActiveTab] = useState<'saved' | 'liked' | 'activity'>('saved');
 
@@ -544,20 +552,20 @@ const UserProfileView = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activeTab === 'saved' && (
-            savedArticles.length > 0 ? savedArticles.map(a => (
-              <ArticleCard key={a.id} article={a} variant="vertical" onClick={() => onArticleClick(a)} isBookmarked={true} onAuthorClick={onAuthorClick} />
-            )) : (
-              <div className="col-span-full py-20 text-center space-y-4 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200">
-                 <Bookmark size={48} className="mx-auto text-slate-200" />
-                 <p className="text-slate-400 font-bold">Vous n'avez pas encore d'articles enregistrés.</p>
-              </div>
-            )
-          )}
-          {activeTab === 'liked' && (
-            likedArticles.length > 0 ? likedArticles.map(a => (
-              <ArticleCard key={a.id} article={a} variant="vertical" onClick={() => onArticleClick(a)} onAuthorClick={onAuthorClick} />
-            )) : (
+              {activeTab === 'saved' && (
+                savedArticles.length > 0 ? savedArticles.map(a => (
+                  <ArticleCard key={a.id} article={a} variant="vertical" onClick={() => onArticleClick(a)} isBookmarked={true} onAuthorClick={onAuthorClick} categoryIcon={categoryIcons?.[a.category]} />
+                )) : (
+                  <div className="col-span-full py-20 text-center space-y-4 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200">
+                     <Bookmark size={48} className="mx-auto text-slate-200" />
+                     <p className="text-slate-400 font-bold">Vous n'avez pas encore d'articles enregistrés.</p>
+                  </div>
+                )
+              )}
+              {activeTab === 'liked' && (
+                likedArticles.length > 0 ? likedArticles.map(a => (
+                  <ArticleCard key={a.id} article={a} variant="vertical" onClick={() => onArticleClick(a)} onAuthorClick={onAuthorClick} categoryIcon={categoryIcons?.[a.category]} />
+                )) : (
               <div className="col-span-full py-20 text-center space-y-4 bg-slate-50 rounded-[40px] border-2 border-dashed border-slate-200">
                  <Heart size={48} className="mx-auto text-slate-200" />
                  <p className="text-slate-400 font-bold">On dirait que vous n'avez pas encore aimé d'articles.</p>
@@ -591,13 +599,15 @@ const ArticleCarousel = ({
   onArticleClick, 
   onBookmark, 
   bookmarkedIds,
-  onAuthorClick
+  onAuthorClick,
+  categoryIcons
 }: { 
   articles: Article[], 
   onArticleClick: (a: Article) => void,
   onBookmark: (id: string, e: React.MouseEvent) => void,
   bookmarkedIds: Set<string>,
-  onAuthorClick?: (name: string) => void
+  onAuthorClick?: (name: string) => void,
+  categoryIcons?: Record<string, string>
 }) => {
   const [scrollIndex, setScrollIndex] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(4);
@@ -662,6 +672,7 @@ const ArticleCarousel = ({
                 onBookmark={onBookmark}
                 isBookmarked={bookmarkedIds.has(article.id)}
                 onAuthorClick={onAuthorClick}
+                categoryIcon={categoryIcons?.[article.category]}
               />
             </div>
           ))}
@@ -1289,13 +1300,14 @@ const ReadAlso = ({ currentArticle, articles, onArticleClick, onAuthorClick }: {
   );
 };
 
-const RelatedArticles = ({ currentArticle, articles, onArticleClick, onBookmark, bookmarkedIds, onAuthorClick }: { 
+const RelatedArticles = ({ currentArticle, articles, onArticleClick, onBookmark, bookmarkedIds, onAuthorClick, categoryIcons }: { 
   currentArticle: Article, 
   articles: Article[], 
   onArticleClick: (a: Article) => void,
   onBookmark: (id: string, e: React.MouseEvent) => void,
   bookmarkedIds: Set<string>,
-  onAuthorClick?: (name: string) => void
+  onAuthorClick?: (name: string) => void,
+  categoryIcons?: Record<string, string>
 }) => {
   const related = React.useMemo(() => {
     return articles
@@ -1338,6 +1350,7 @@ const RelatedArticles = ({ currentArticle, articles, onArticleClick, onBookmark,
             onBookmark={onBookmark}
             isBookmarked={bookmarkedIds.has(article.id)}
             onAuthorClick={onAuthorClick}
+            categoryIcon={categoryIcons?.[article.category]}
           />
         ))}
       </div>
@@ -1467,7 +1480,7 @@ const NotificationCenter = ({
       initial={{ opacity: 0, x: 100 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 100 }}
-      className="fixed top-20 right-6 z-[200] w-full max-w-sm bg-white rounded-[32px] shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[70vh]"
+      className="fixed top-20 right-4 md:right-6 z-[200] w-[calc(100vw-32px)] md:w-full max-w-sm bg-white rounded-[32px] shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[70vh]"
     >
       <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
         <h3 className="text-xl font-black flex items-center gap-2">
@@ -1582,12 +1595,12 @@ const SupportChatWidget = ({ user, isDarkMode }: { user: FirebaseUser | null, is
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
             className={cn(
-              "w-[350px] md:w-[400px] h-[550px] rounded-[40px] shadow-2xl border flex flex-col overflow-hidden",
+              "w-[calc(100vw-48px)] max-w-[400px] h-[500px] md:h-[550px] max-h-[80vh] rounded-[40px] shadow-2xl border flex flex-col overflow-hidden",
               isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"
             )}
           >
             {/* Header */}
-            <div className="p-8 bg-primary text-white flex items-center justify-between">
+            <div className="p-6 md:p-8 bg-primary text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-white/20 rounded-2xl">
                   <Headset size={24} />
@@ -1824,14 +1837,14 @@ const PostClassifiedModal = ({ onClose, onPost }: { onClose: () => void, onPost:
       <motion.div 
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
-        className="bg-white rounded-[40px] max-w-lg w-full p-8 shadow-2xl space-y-6"
+        className="bg-white rounded-[40px] max-w-lg w-full p-6 md:p-8 shadow-2xl flex flex-col max-h-[90vh]"
       >
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mb-6 shrink-0">
           <h3 className="text-2xl font-black">Publier une annonce</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-900"><X size={24}/></button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-900 transition-colors p-2"><X size={24}/></button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar pb-6 flex-1">
           <input 
             type="text" 
             placeholder="Titre de l'annonce"
@@ -3713,7 +3726,7 @@ export default function App() {
                     activeCategory === cat && currentView === 'home' ? "text-primary" : "text-slate-400"
                   )}
                 >
-                  {cat}
+                  {siteSettings?.categories_icons?.[cat] || '📰'} {cat}
                 </button>
               ))}
               <div className="h-px bg-slate-100 my-4" />
@@ -3804,11 +3817,12 @@ export default function App() {
                 key={cat}
                 onClick={() => handleCategoryClick(cat)}
                 className={cn(
-                  "text-sm font-bold transition-colors hover:text-primary whitespace-nowrap",
+                  "text-sm font-bold transition-colors hover:text-primary whitespace-nowrap flex items-center gap-1.5",
                   activeCategory === cat && currentView === 'home' ? "text-primary" : "text-slate-500"
                 )}
               >
-                {cat}
+                <span>{siteSettings?.categories_icons?.[cat] || '📰'}</span>
+                <span>{cat}</span>
               </button>
             ))}
             <button 
@@ -3965,7 +3979,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 md:py-10">
+      <main className="max-w-7xl mx-auto px-4 py-6 md:py-10 pb-28 lg:pb-10">
         <AnimatePresence mode="wait">
           {isLoading ? (
             <motion.div 
@@ -3997,13 +4011,14 @@ export default function App() {
                       document.getElementById(`cat-tab-${cat}`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
                     }}
                     className={cn(
-                      "px-5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 shadow-sm",
+                      "px-5 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 shadow-sm flex items-center gap-2",
                       activeCategory === cat 
                         ? "bg-primary text-white shadow-primary/20" 
                         : "bg-white text-slate-500 border border-slate-200"
                     )}
                   >
-                    {cat}
+                    <span>{siteSettings?.categories_icons?.[cat] || '📰'}</span>
+                    <span>{cat}</span>
                   </button>
                 ))}
               </div>
@@ -4017,6 +4032,7 @@ export default function App() {
                     onBookmark={handleBookmarkArticle}
                     bookmarkedIds={userBookmarkedArticles}
                     onAuthorClick={handleAuthorClick}
+                    categoryIcons={siteSettings?.categories_icons}
                   />
                   
                   <TrendingSection 
@@ -4025,6 +4041,7 @@ export default function App() {
                     onBookmark={handleBookmarkArticle}
                     bookmarkedIds={userBookmarkedArticles}
                     onAuthorClick={handleAuthorClick}
+                    categoryIcons={siteSettings?.categories_icons}
                   />
                   <GoogleAd className="my-10" label="Annonce à la une" />
                 </section>
@@ -4192,7 +4209,7 @@ export default function App() {
                 <button onClick={goHome} className="text-primary text-xs font-bold flex items-center gap-1 justify-center mb-4">
                   <ArrowLeft size={14} /> Retour à l'accueil
                 </button>
-                <Badge category={selectedArticle.category}>{selectedArticle.category}</Badge>
+                <Badge category={selectedArticle.category} icon={siteSettings?.categories_icons?.[selectedArticle.category]}>{selectedArticle.category}</Badge>
                 <h1 className="text-2xl md:text-4xl font-display font-black leading-[1.1] tracking-tight text-slate-900">
                   {selectedArticle.title}
                 </h1>
@@ -4695,6 +4712,7 @@ export default function App() {
                 onBookmark={handleBookmarkArticle}
                 bookmarkedIds={userBookmarkedArticles}
                 onAuthorClick={handleAuthorClick}
+                categoryIcons={siteSettings?.categories_icons}
               />
 
               <ArticleCarousel 
@@ -4703,6 +4721,7 @@ export default function App() {
                 onBookmark={handleBookmarkArticle}
                 bookmarkedIds={userBookmarkedArticles}
                 onAuthorClick={handleAuthorClick}
+                categoryIcons={siteSettings?.categories_icons}
               />
             </motion.div>
           ) : currentView === 'search' ? (
@@ -4786,7 +4805,7 @@ export default function App() {
                             onChange={(e) => setFilterCategory(e.target.value)}
                           >
                             <option value="">Toutes les catégories</option>
-                            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            {categories.map(cat => <option key={cat} value={cat}>{siteSettings?.categories_icons?.[cat] || '📰'} {cat}</option>)}
                           </select>
                         </div>
                       </div>
@@ -4858,6 +4877,7 @@ export default function App() {
               onFollowCategory={handleFollowCategory}
               onAuthorClick={handleAuthorClick}
               onUpgrade={() => setShowPremiumModal(true)}
+              categoryIcons={siteSettings?.categories_icons}
             />
           ) : currentView === 'donate' ? (
             <motion.div 
@@ -5573,7 +5593,10 @@ Dernière mise à jour : Avril 2026
             <h4 className="font-black text-sm uppercase tracking-widest">Catégories</h4>
             <ul className="space-y-3 text-sm text-slate-500">
               {categories.slice(1).map(cat => (
-                <li key={cat} onClick={() => handleCategoryClick(cat)} className="hover:text-primary cursor-pointer transition-colors">{cat}</li>
+                <li key={cat} onClick={() => handleCategoryClick(cat)} className="hover:text-primary cursor-pointer transition-colors flex items-center gap-2">
+                  <span>{siteSettings?.categories_icons?.[cat] || '📰'}</span>
+                  {cat}
+                </li>
               ))}
             </ul>
           </div>
@@ -5739,46 +5762,47 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings, getP
       <motion.div
         initial={{ scale: 0.9, y: 20 }}
         animate={{ scale: 1, y: 0 }}
-        className="bg-white w-full max-w-2xl rounded-[40px] overflow-hidden shadow-2xl relative"
+        className="bg-white w-full max-w-2xl rounded-[40px] overflow-hidden shadow-2xl relative flex flex-col md:flex-row max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
-        <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-full text-slate-400 z-10">
+        <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-slate-100 rounded-full text-slate-400 z-50">
           <X size={24} />
         </button>
 
-        <div className="flex flex-col md:flex-row h-full">
-           <div className="md:w-2/5 relative overflow-hidden bg-slate-900 p-10 flex flex-col justify-end text-white min-h-[250px] md:min-h-full">
-              <div className="absolute inset-0 african-pattern opacity-10" />
-              <div className="relative z-10 space-y-4">
-                 <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center text-primary border border-primary/20 mb-6">
-                    <TrendingUp size={32} />
-                 </div>
-                 <h2 className="text-4xl font-black italic tracking-tighter leading-none uppercase">Akwaba<br/>Premium</h2>
-                 <p className="text-slate-400 text-sm font-medium">L'information exclusive à portée de main.</p>
-                 
-                 <div className="pt-6 space-y-3">
-                    {[
-                      "Articles & Investigations exclusifs",
-                      "Web TV & Live Streaming illimité",
-                      "Événements & Agenda VIP",
-                      "Accès prioritaire aux petites annonces",
-                      "Expérience sans publicité"
-                    ].map((benefit, i) => (
-                      <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-slate-300">
-                        <CheckCircle size={12} className="text-primary" />
-                        {benefit}
-                      </div>
-                    ))}
-                 </div>
+        <div className="md:w-2/5 relative overflow-hidden bg-slate-900 p-8 md:p-10 flex flex-col justify-end text-white shrink-0 min-h-[200px] md:min-h-full">
+           <div className="absolute inset-0 african-pattern opacity-10" />
+           <div className="relative z-10 space-y-4">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-primary/20 rounded-2xl flex items-center justify-center text-primary border border-primary/20 mb-4 md:mb-6">
+                 <TrendingUp size={28} className="md:hidden" />
+                 <TrendingUp size={32} className="hidden md:block" />
+              </div>
+              <h2 className="text-2xl md:text-4xl font-black italic tracking-tighter leading-none uppercase">Akwaba<br/>Premium</h2>
+              <p className="text-slate-400 text-[10px] md:text-sm font-medium">L'information exclusive à portée de main.</p>
+              
+              <div className="pt-4 md:pt-6 space-y-2 md:space-y-3 hidden sm:block">
+                 {[
+                   "Articles & Investigations exclusifs",
+                   "Web TV & Live Streaming illimité",
+                   "Événements & Agenda VIP",
+                   "Accès prioritaire aux petites annonces",
+                   "Expérience sans publicité"
+                 ].map((benefit, i) => (
+                   <div key={i} className="flex items-center gap-2 text-[9px] md:text-[10px] font-bold text-slate-300">
+                     <CheckCircle size={10} className="text-primary md:hidden" />
+                     <CheckCircle size={12} className="text-primary hidden md:block" />
+                     {benefit}
+                   </div>
+                 ))}
+              </div>
 
-                 <div className="pt-8 border-t border-white/10 mt-8">
-                    <span className="text-3xl font-black">{price} XOF</span>
-                    <span className="text-xs text-slate-500 font-bold ml-2">/ MOIS</span>
-                 </div>
+              <div className="pt-4 md:pt-8 border-t border-white/10 mt-4 md:mt-8">
+                 <span className="text-xl md:text-3xl font-black">{price} XOF</span>
+                 <span className="text-[10px] md:text-xs text-slate-500 font-bold ml-2">/ MOIS</span>
               </div>
            </div>
+        </div>
 
-           <div className="md:w-3/5 p-8 md:p-12 space-y-8 bg-white overflow-y-auto max-h-[90vh]">
+        <div className="md:w-3/5 p-6 md:p-12 space-y-8 bg-white overflow-y-auto custom-scrollbar">
               {!paymentInitiated ? (
                 <>
                   <div className="space-y-6">
@@ -5918,8 +5942,7 @@ const PremiumModal = ({ onClose, onUpgrade, price, activeMethods, settings, getP
                  </p>
               </div>
            </div>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-};
+       </motion.div>
+     </motion.div>
+   );
+ };

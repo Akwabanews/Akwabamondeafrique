@@ -144,6 +144,7 @@ export interface SiteSettings {
   flashNews?: string; // Semicolon separated news for ticker
   // Categories
   categories: string[];
+  categories_icons?: Record<string, string>;
   // Maintenance
   maintenanceMode: boolean;
   // Donations & Premium

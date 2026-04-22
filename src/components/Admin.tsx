@@ -661,11 +661,11 @@ export const AdminDashboard = ({
 
       {/* Modern Horizontal Tabs with snap and custom scroll */}
       <div className="relative group">
-        <div className="flex border-b border-slate-100 overflow-x-auto whitespace-nowrap scrollbar-hide snap-x scroll-smooth -mx-4 px-4 lg:mx-0 lg:px-0">
+        <div className="flex border-b border-slate-100 overflow-x-auto whitespace-nowrap custom-scrollbar snap-x scroll-smooth -mx-4 px-4 lg:mx-0 lg:px-0">
         <button 
           onClick={() => setActiveTab('articles')}
           className={cn(
-            "px-6 py-4 font-black transition-all border-b-2 shrink-0 text-sm",
+            "px-6 py-4 font-black transition-all border-b-2 shrink-0 text-xs md:text-sm",
             activeTab === 'articles' ? "border-primary text-primary" : "border-transparent text-slate-400 hover:text-slate-600"
           )}
         >
@@ -1050,48 +1050,87 @@ export const AdminDashboard = ({
 
               {/* Dynamic Categories */}
               <div className="bg-white rounded-3xl border border-slate-100 shadow-xl p-8 space-y-6">
-                <h3 className="text-xl font-black flex items-center gap-2"><Tag /> Gestion des Catégories</h3>
-                <div className="flex flex-wrap gap-2">
-                  {tempSettings?.categories?.map((cat, i) => (
-                    <div key={`${cat}-${i}`} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full text-xs font-black">
-                      {cat}
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          if (tempSettings?.categories) {
-                            setTempSettings({...tempSettings, categories: tempSettings.categories.filter(c => c !== cat)});
-                          }
-                        }} 
-                        className="text-red-500 hover:scale-110"
-                      >
-                        <X size={14}/>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="Nouvelle catégorie..."
-                    value={newCategory}
-                    onChange={e => setNewCategory(e.target.value)}
-                    className="flex-1 bg-slate-50 rounded-xl px-4 py-2 text-sm outline-none border border-slate-100"
-                  />
-                  <button 
-                    onClick={() => {
-                      if(newCategory && tempSettings?.categories && !tempSettings.categories.includes(newCategory)) {
-                        setTempSettings({
-                          ...tempSettings, 
-                          categories: [...(tempSettings.categories || []), newCategory]
-                        });
-                        setNewCategory('');
-                      }
-                    }}
-                    className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold"
-                  >
-                    Ajouter
-                  </button>
-                </div>
+                {(() => {
+                  const mapCategoryIcon = (name: string) => {
+                    const n = name.toLowerCase();
+                    if (n.includes('politique')) return '🏛️';
+                    if (n.includes('éco') || n.includes('eco')) return '💰';
+                    if (n.includes('science')) return '🔬';
+                    if (n.includes('santé') || n.includes('sante')) return '🏥';
+                    if (n.includes('culture')) return '🎨';
+                    if (n.includes('histoire')) return '📜';
+                    if (n.includes('sport')) return '⚽';
+                    if (n.includes('afrique')) return '🌍';
+                    if (n.includes('monde')) return '🌐';
+                    if (n.includes('urgent')) return '🚨';
+                    if (n.includes('tech')) return '💻';
+                    if (n.includes('une')) return '🔥';
+                    return '📰';
+                  };
+
+                  return (
+                    <>
+                      <h3 className="text-xl font-black flex items-center gap-2"><Tag /> Gestion des Catégories</h3>
+                      <div className="flex flex-wrap gap-3">
+                        {tempSettings?.categories?.map((cat, i) => (
+                          <div key={`${cat}-${i}`} className="flex items-center gap-3 bg-slate-100 px-4 py-2 rounded-2xl text-xs font-black group">
+                            <input 
+                              type="text" 
+                              value={tempSettings.categories_icons?.[cat] || '📰'} 
+                              onChange={(e) => {
+                                const newIcons = { ...(tempSettings.categories_icons || {}), [cat]: e.target.value };
+                                setTempSettings({ ...tempSettings, categories_icons: newIcons });
+                              }}
+                              className="w-6 bg-transparent border-none p-0 text-center text-lg outline-none cursor-pointer"
+                              title="Modifier l'icône"
+                            />
+                            <span>{cat}</span>
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                if (tempSettings?.categories) {
+                                  const newCats = tempSettings.categories.filter(c => c !== cat);
+                                  const newIcons = { ...(tempSettings.categories_icons || {}) };
+                                  delete newIcons[cat];
+                                  setTempSettings({...tempSettings, categories: newCats, categories_icons: newIcons});
+                                }
+                              }} 
+                              className="text-red-500 hover:scale-110 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X size={14}/>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="Nouvelle catégorie..."
+                          value={newCategory}
+                          onChange={e => setNewCategory(e.target.value)}
+                          className="flex-1 bg-slate-50 rounded-xl px-4 py-2 text-sm outline-none border border-slate-100"
+                        />
+                        <button 
+                          onClick={() => {
+                            if(newCategory && tempSettings?.categories && !tempSettings.categories.includes(newCategory)) {
+                              const autoIcon = mapCategoryIcon(newCategory);
+                              const newIcons = { ...(tempSettings.categories_icons || {}), [newCategory]: autoIcon };
+                              setTempSettings({
+                                ...tempSettings, 
+                                categories: [...(tempSettings.categories || []), newCategory],
+                                categories_icons: newIcons
+                              });
+                              setNewCategory('');
+                            }
+                          }}
+                          className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold"
+                        >
+                          Ajouter
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="sticky bottom-4 z-10 flex justify-end">
@@ -1373,24 +1412,26 @@ export const AdminDashboard = ({
                 </div>
               </div>
 
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
-                <div className="grid grid-cols-12 px-6 py-4 bg-slate-50/50 border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                  <div className="col-span-4">Utilisateur</div>
-                  <div className="col-span-3">Date d'expiration</div>
-                  <div className="col-span-2">Mode Paiement</div>
-                  <div className="col-span-3 text-right">Actions</div>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  <PremiumUserList 
-                    onUpgrade={async (uid) => {
-                      await SupabaseService.upgradeToPremium(uid, 'Admin Override', 1);
-                      alert("Utilisateur passé en Premium pour 1 mois.");
-                    }}
-                    onUpdateStatus={async (uid, date) => {
-                      await SupabaseService.setPremiumUntil(uid, date);
-                      alert("Statut premium mis à jour avec succès.");
-                    }}
-                  />
+              <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-x-auto custom-scrollbar">
+                <div className="min-w-[800px]">
+                  <div className="grid grid-cols-12 px-6 py-4 bg-slate-50/50 border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <div className="col-span-4">Utilisateur</div>
+                    <div className="col-span-3">Date d'expiration</div>
+                    <div className="col-span-2">Mode Paiement</div>
+                    <div className="col-span-3 text-right">Actions</div>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    <PremiumUserList 
+                      onUpgrade={async (uid) => {
+                        await SupabaseService.upgradeToPremium(uid, 'Admin Override', 1);
+                        alert("Utilisateur passé en Premium pour 1 mois.");
+                      }}
+                      onUpdateStatus={async (uid, date) => {
+                        await SupabaseService.setPremiumUntil(uid, date);
+                        alert("Statut premium mis à jour avec succès.");
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -2208,8 +2249,9 @@ const TransactionsList = ({ onValidate }: { onValidate?: (tid: string, uid: stri
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{transactions.length} transactions</span>
       </div>
       
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
-        <div className="grid grid-cols-12 px-6 py-4 bg-slate-50/50 border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-x-auto custom-scrollbar">
+        <div className="min-w-[900px]">
+          <div className="grid grid-cols-12 px-6 py-4 bg-slate-50/50 border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
           <div className="col-span-3">Utilisateur / Email</div>
           <div className="col-span-2">Montant</div>
           <div className="col-span-2">Type</div>
@@ -2253,7 +2295,8 @@ const TransactionsList = ({ onValidate }: { onValidate?: (tid: string, uid: stri
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export const AdminEditor = ({ 
